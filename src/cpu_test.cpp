@@ -43,6 +43,28 @@ TEST(CpuTest, FlagValuesAreCorrect) {
   EXPECT_EQ(r.zf, 1);
 }
 
+TEST(CpuTest, RegIndexWorksCorrect) {
+  InitializeRegisters();
+  Registers& r = GetRegisters();
+  r.BC = 0x1234;
+  uint8_t** reg_ind = GetRegIndex();
+  uint16_t** reg_16ind = GetReg16Index();
+  EXPECT_EQ(*reg_ind[0], 0x12);
+  EXPECT_EQ(*reg_ind[1], 0x34);
+  EXPECT_EQ(*reg_16ind[0], 0x1234);
+  r.DE = 0x4567;
+  EXPECT_EQ(*reg_ind[2], 0x45);
+  EXPECT_EQ(*reg_ind[3], 0x67);
+  EXPECT_EQ(*reg_16ind[1], 0x4567);
+  r.HL = 0x6789;
+  EXPECT_EQ(*reg_ind[4], 0x67);
+  EXPECT_EQ(*reg_ind[5], 0x89);
+  EXPECT_EQ(*reg_16ind[2], 0x6789);
+  r.SP = 0xFFFF;
+  EXPECT_EQ(*reg_16ind[3], 0xFFFF);
+
+}
+
 TEST(CpuTest, ReadInstruction) {
 
 }

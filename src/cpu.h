@@ -64,6 +64,9 @@ enum mode {
 template <mode m>
 uint8_t access(uint16_t addr, uint8_t val = 0);
 
+uint8_t** GetRegIndex();
+uint16_t** GetReg16Index();
+Registers& GetRegisters();
 
 uint8_t rd8(uint16_t addr);
 uint8_t wr8(uint16_t addr, uint8_t val);

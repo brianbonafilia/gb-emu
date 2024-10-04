@@ -12,10 +12,11 @@ namespace {
 int tick_count = 0;
 
 Registers registers;
-uint8_t** reg_ind = new uint8_t*[10];
+uint8_t **reg_ind = new uint8_t *[7];
+uint16_t **reg_16ind = new uint16_t * [4];
 }  //  namespace
 
-template <mode m>
+template<mode m>
 uint8_t access(uint16_t addr, uint8_t val) {
   switch (addr) {
     case 0x0000 ... 0X3FFF:
@@ -97,11 +98,64 @@ void InitializeRegisters() {
   reg_ind[4] = &registers.H;
   reg_ind[5] = &registers.L;
   reg_ind[6] = &registers.A;
+
+  reg_16ind[0] = &registers.BC;
+  reg_16ind[1] = &registers.DE;
+  reg_16ind[2] = &registers.HL;
+  reg_16ind[3] = &registers.SP;
+
 };
 
+uint8_t** GetRegIndex() {
+  return reg_ind;
+}
+
+uint16_t** GetReg16Index() {
+  return reg_16ind;
+}
+
+Registers& GetRegisters() {
+  return registers;
+}
+
 void Execute_00_3F(int8_t op_code) {
+  if (op_code % 8 == 1) {
+    switch (op_code / 8) {
+      case 0:
+        LD16(registers.BC, rd16(registers.PC));
+        registers.PC += 2;
+        return;
+      case 1:
+        ADD_HL(registers, registers.BC);
+        return;
+      case 2:
+        LD16(registers.DE, rd16(registers.PC));
+        registers.PC += 2;
+        return;
+      case 3:
+        ADD_HL(registers, registers.DE);
+        return;
+      case 4:
+        LD16(registers.HL, rd16(registers.PC));
+        registers.PC += 2;
+        return;
+      case 5:
+        ADD_HL(registers, registers.HL);
+        return;
+      case 6:
+        LD16(registers.SP, rd16(registers.PC));
+        registers.PC += 2;
+        return;
+      case 7:
+        ADD_HL(registers, registers.SP);
+        return;
+    default:
+      std::cerr << "unexpected ADD_HL/LD16 opcode" << op_code;
+      return;
+    }
+  }
   if (op_code % 8 == 2) {
-    switch(op_code / 8) {
+    switch (op_code / 8) {
       case 0:
         LD_MEM(registers.BC, registers.A);
         return;
@@ -132,13 +186,12 @@ void Execute_00_3F(int8_t op_code) {
     }
   }
   if (op_code % 8 == 3) {
-    switch (op_code / 8) {
-
-    }
+    std::function<void(uint16_t&)> index_func = (op_code / 8) % 2 ? DEC : INC;
+    index_func(*reg_16ind[(op_code % 8) / 2]);
   }
   if (op_code % 8 == 4 || op_code % 8 == 5) {
-    std::function<void(Registers&, uint8_t&)> ind_funct = op_code & 8 == 4 ?
-        INC_8 : DEC_8;
+    std::function<void(Registers &, uint8_t &)> ind_funct = op_code % 8 == 4 ?
+                                                            INC_8 : DEC_8;
     int val = op_code / 8;
     switch (val) {
       case 0 ... 5:
@@ -154,9 +207,39 @@ void Execute_00_3F(int8_t op_code) {
         ind_funct(registers, registers.A);
         return;
       default:
-        std::cerr << "unexpected INC8/DEC8 val" << val;
+        std::cerr << "unexpected INC8/DEC8 opcode" << op_code;
         return;
     }
+  }
+  if (op_code % 8 == 6) {
+    switch (op_code / 8) {
+      case 0 ... 5:
+        LD(*reg_ind[op_code / 8], rd8(registers.PC++));
+        return;
+      case 6:
+        LD_MEM(registers.HL, rd8(registers.PC++));
+        return;
+      case 7:
+        LD(registers.A, rd8(registers.PC++));
+        return;
+      default:
+        std::cerr << "unexpected INC8/DEC8 opcode" << op_code;
+        return;
+    }
+  }
+  switch (op_code) {
+    case 0x01:
+      LD16(registers.BC, rd16(registers.PC));
+      registers.PC += 2;
+      break;
+    case 0x02:
+
+    case 0x03:
+      INC(registers.BC);
+      break;
+    default:
+      std::cerr << "unexpected INC8/DEC8 val" << op_code;
+      return;
   }
 }
 
@@ -168,15 +251,6 @@ void ProcessInstruction(bool debug) {
   switch (op) {
     case 0x00 ... 0x3F:
       Execute_00_3F(op);
-      break;
-    case 0x01:
-      LD16(registers.BC, rd16(registers.PC));
-      registers.PC += 2;
-      break;
-    case 0x02:
-
-    case 0x03:
-      INC(registers.BC);
       break;
     case 0x40 ... 0x45:
       LD(registers.B, *reg_ind[op - 0x40]);

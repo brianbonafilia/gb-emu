@@ -93,6 +93,7 @@ void ADD_HL(Registers& registers, uint16_t r) {
 }
 
 void DEC(uint16_t& r) {
+  Tick();
   r--;
 }
 
