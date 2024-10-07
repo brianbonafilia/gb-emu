@@ -54,6 +54,8 @@ struct Registers {
   uint16_t SP;
   // Program Counter
   uint16_t PC;
+
+  bool IME;
 };
 
 enum mode {
@@ -69,6 +71,7 @@ uint16_t** GetReg16Index();
 Registers& GetRegisters();
 
 uint8_t rd8(uint16_t addr);
+uint16_t rd16(uint16_t addr);
 uint8_t wr8(uint16_t addr, uint8_t val);
 
 // Power up sequence initialize registers;

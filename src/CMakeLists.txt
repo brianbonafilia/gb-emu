@@ -4,6 +4,10 @@ add_library(cpu cpu.cpp cpu.h
         cartridge.h alu.cpp alu.h)
 
 set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
+        mapper.cpp
+        mapper.h
+        gui.cpp
+        gui.h
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
@@ -18,15 +22,40 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+set(SDL_2_VERSION 2.30.8)
+
+FetchContent_Declare(
+        SDL2
+        URL https://github.com/libsdl-org/SDL/archive/refs/tags/release-2.30.8.tar.gz
+        FIND_PACKAGE_ARGS ${SDL2_VERSION} EXACT
+)
+
+FetchContent_MakeAvailable(SDL2)
+
+
 enable_testing()
 
 add_executable(
         cpu_test cpu_test.cpp cpu alu.cpp
 )
+
+add_executable(alu_test alu.cpp cpu.cpp
+        alu_test.cpp)
+
+target_link_libraries(
+        gb_emu
+        SDL2::SDL2
+)
+
 target_link_libraries(
         cpu_test
+        GTest::gtest_main
+)
+target_link_libraries(
+        alu_test
         GTest::gtest_main
 )
 
 include(GoogleTest)
 gtest_discover_tests(cpu_test)
+gtest_discover_tests(alu_test)

@@ -13,7 +13,9 @@ int tick_count = 0;
 
 Registers registers;
 uint8_t **reg_ind = new uint8_t *[7];
-uint16_t **reg_16ind = new uint16_t * [4];
+uint16_t **reg_16ind = new uint16_t *[4];
+// start with 8KiB, will have to update to support GBC banking later
+uint8_t *wram = new uint8_t[0x2000];
 }  //  namespace
 
 template<mode m>
@@ -33,8 +35,17 @@ uint8_t access(uint16_t addr, uint8_t val) {
       return 0;
     case 0xC000 ... 0xCFFF:
       // Work RAM
-      return 0;
-    case 0xD000 ... 0xFDFF:
+      if (m == write) {
+        wram[addr - 0xC000] = val;
+      }
+      return wram[addr - 0xC000];
+    case 0xD000 ... 0xDFFF:
+      // WRAM which is banked for GBC
+      if (m == write) {
+        wram[addr - 0xC000] = val;
+      }
+      return wram[addr - 0xC000];
+    case 0xE000 ... 0xFDFF:
       // Not supposed to go here
       return 0;
     case 0xFE00 ... 0xFE9F:
@@ -50,16 +61,26 @@ uint8_t access(uint16_t addr, uint8_t val) {
       // High RAM
       return 0;
     case 0xFFFF:
-      // Interrupt register
+      // Interrupt enable register
       return 0;
   }
   return 0;
 }
 
+uint8_t imm8() {
+  return rd8(registers.PC++);
+}
+
+uint16_t imm16() {
+  uint16_t  val = rd16(registers.PC);
+  registers.PC += 2;
+  return val;
+}
+
 uint16_t rd16(uint16_t addr) {
   Tick();
   Tick();
-  return access<read>(addr) << 8 || access<read>(addr + 1);
+  return access<read>(addr) | (access<read>(addr + 1) << 8);
 }
 
 uint8_t rd8(uint16_t addr) {
@@ -106,140 +127,371 @@ void InitializeRegisters() {
 
 };
 
-uint8_t** GetRegIndex() {
+uint8_t **GetRegIndex() {
   return reg_ind;
 }
 
-uint16_t** GetReg16Index() {
+uint16_t **GetReg16Index() {
   return reg_16ind;
 }
 
-Registers& GetRegisters() {
+Registers &GetRegisters() {
   return registers;
 }
 
-void Execute_00_3F(int8_t op_code) {
-  if (op_code % 8 == 1) {
-    switch (op_code / 8) {
-      case 0:
-        LD16(registers.BC, rd16(registers.PC));
-        registers.PC += 2;
-        return;
-      case 1:
-        ADD_HL(registers, registers.BC);
-        return;
-      case 2:
-        LD16(registers.DE, rd16(registers.PC));
-        registers.PC += 2;
-        return;
-      case 3:
-        ADD_HL(registers, registers.DE);
-        return;
-      case 4:
-        LD16(registers.HL, rd16(registers.PC));
-        registers.PC += 2;
-        return;
-      case 5:
-        ADD_HL(registers, registers.HL);
-        return;
-      case 6:
-        LD16(registers.SP, rd16(registers.PC));
-        registers.PC += 2;
-        return;
-      case 7:
-        ADD_HL(registers, registers.SP);
-        return;
-    default:
-      std::cerr << "unexpected ADD_HL/LD16 opcode" << op_code;
-      return;
-    }
-  }
-  if (op_code % 8 == 2) {
-    switch (op_code / 8) {
-      case 0:
-        LD_MEM(registers.BC, registers.A);
-        return;
-      case 1:
-        LD(registers.A, rd8(registers.BC));
-        return;
-      case 2:
-        LD_MEM(registers.DE, registers.A);
-        return;
-      case 3:
-        LD(registers.A, rd8(registers.DE));
-        return;
-      case 4:
-        LD_MEM(registers.HL++, registers.A);
-        return;
-      case 5:
-        LD(registers.A, rd8(registers.HL++));
-        return;
-      case 6:
-        LD_MEM(registers.HL--, registers.A);
-        return;
-      case 7:
-        LD(registers.A, registers.HL--);
-        return;
-      default:
-        std::cerr << "unexpected LD val" << op_code;
-        return;
-    }
-  }
-  if (op_code % 8 == 3) {
-    std::function<void(uint16_t&)> index_func = (op_code / 8) % 2 ? DEC : INC;
-    index_func(*reg_16ind[(op_code % 8) / 2]);
-  }
-  if (op_code % 8 == 4 || op_code % 8 == 5) {
-    std::function<void(Registers &, uint8_t &)> ind_funct = op_code % 8 == 4 ?
-                                                            INC_8 : DEC_8;
-    int val = op_code / 8;
-    switch (val) {
-      case 0 ... 5:
-        ind_funct(registers, *reg_ind[val]);
-        return;
-      case 6: {
-        uint8_t hl_val = rd8(registers.HL);
-        ind_funct(registers, hl_val);
-        wr8(registers.HL, hl_val);
-        return;
-      }
-      case 7:
-        ind_funct(registers, registers.A);
-        return;
-      default:
-        std::cerr << "unexpected INC8/DEC8 opcode" << op_code;
-        return;
-    }
-  }
-  if (op_code % 8 == 6) {
-    switch (op_code / 8) {
-      case 0 ... 5:
-        LD(*reg_ind[op_code / 8], rd8(registers.PC++));
-        return;
-      case 6:
-        LD_MEM(registers.HL, rd8(registers.PC++));
-        return;
-      case 7:
-        LD(registers.A, rd8(registers.PC++));
-        return;
-      default:
-        std::cerr << "unexpected INC8/DEC8 opcode" << op_code;
-        return;
-    }
-  }
-  switch (op_code) {
-    case 0x01:
-      LD16(registers.BC, rd16(registers.PC));
-      registers.PC += 2;
-      break;
-    case 0x02:
+bool nz() {
+  return registers.zf == 0;
+}
 
-    case 0x03:
-      INC(registers.BC);
+bool z() {
+  return registers.zf;
+}
+
+bool nc() {
+  return registers.cf == 0;
+}
+
+bool c() {
+  return registers.cf;
+}
+
+void Execute_CB_Prefixed(uint8_t op_code) {
+
+}
+
+void Execute_00_3F(uint8_t op_code) {
+  switch (op_code % 8) {
+    case 0:
+      switch (op_code / 8) {
+        case 0:
+          return;
+        case 1:
+          LD_MEM(imm16(), registers.SP);
+          return;
+        case 2:
+          // TODO: STOP
+          std::cerr << "was supposed to stop but didnt" << std::endl;
+          return;
+        case 3:
+          JR(registers, (int8_t) rd8(registers.PC++));
+          return;
+        case 4:
+          JR(registers, (int8_t) rd8(registers.PC++), nz());
+          return;
+        case 5:
+          JR(registers, (int8_t) rd8(registers.PC++), z());
+          return;
+        case 6:
+          JR(registers, (int8_t) rd8(registers.PC++), nc());
+          return;
+        case 7:
+          JR(registers, (int8_t) rd8(registers.PC++), c());
+        default:
+          break;
+      }
       break;
-    default:
-      std::cerr << "unexpected INC8/DEC8 val" << op_code;
+    case 1:
+      switch (op_code / 8) {
+        case 0:
+          LD16(registers.BC, imm16());
+          return;
+        case 1:
+          ADD_HL(registers, registers.BC);
+          return;
+        case 2:
+          LD16(registers.DE, imm16());
+          return;
+        case 3:
+          ADD_HL(registers, registers.DE);
+          return;
+        case 4:
+          LD16(registers.HL, imm16());
+          return;
+        case 5:
+          ADD_HL(registers, registers.HL);
+          return;
+        case 6:
+          LD16(registers.SP, imm16());
+          return;
+        case 7:
+          ADD_HL(registers, registers.SP);
+          return;
+        default:
+          break;
+      }
+      break;
+    case 2:
+      switch (op_code / 8) {
+        case 0:
+          LD_MEM(registers.BC, registers.A);
+          return;
+        case 1:
+          LD(registers.A, rd8(registers.BC));
+          return;
+        case 2:
+          LD_MEM(registers.DE, registers.A);
+          return;
+        case 3:
+          LD(registers.A, rd8(registers.DE));
+          return;
+        case 4:
+          LD_MEM(registers.HL++, registers.A);
+          return;
+        case 5:
+          LD(registers.A, rd8(registers.HL++));
+          return;
+        case 6:
+          LD_MEM(registers.HL--, registers.A);
+          return;
+        case 7:
+          LD(registers.A, registers.HL--);
+          return;
+        default:
+          break;
+      }
+      break;
+    case 3:
+    {
+      std::function<void(uint16_t &)> index_func = (op_code / 8) % 2 ? DEC : INC;
+      index_func(*reg_16ind[(op_code % 8) / 2]);
+    }
+    case 4 ... 5:
+    {
+      std::function<void(Registers &, uint8_t &)> ind_func = op_code % 8 == 4 ?
+                                                              INC_8 : DEC_8;
+      int val = op_code / 8;
+      switch (val) {
+        case 0 ... 5:
+          ind_func(registers, *reg_ind[val]);
+          return;
+        case 6: {
+          uint8_t hl_val = rd8(registers.HL);
+          ind_func(registers, hl_val);
+          wr8(registers.HL, hl_val);
+          return;
+        }
+        case 7:
+          ind_func(registers, registers.A);
+          return;
+        default:
+          break;
+      }
+      break;
+    }
+    case 6:
+      switch (op_code / 8) {
+        case 0 ... 5:
+          LD(*reg_ind[op_code / 8], rd8(registers.PC++));
+          return;
+        case 6:
+          LD_MEM(registers.HL, rd8(registers.PC++));
+          return;
+        case 7:
+          LD(registers.A, rd8(registers.PC++));
+          return;
+        default:
+          break;
+      }
+      break;
+    case 7:
+      switch (op_code / 8) {
+        case 0:
+          RLC(registers, registers.A);
+          return;
+        case 1:
+          RRC(registers, registers.A);
+          return;
+        case 2:
+          RL(registers, registers.A);
+          return;
+        case 3:
+          RR(registers, registers.A);
+          return;
+        case 4:
+          DAA(registers);
+          return;
+        case 5:
+          CPL(registers);
+          return;
+        case 6:
+          SCF(registers);
+          return;
+        case 7:
+          CCF(registers);
+          return;
+        default:
+          break;
+      }
+  }
+  std::cerr << "got a bad op code 0x" << std::hex << (int) op_code;
+}
+
+void Execute_C0_FF(uint8_t op_code) {
+  int octal_col = op_code % 8;
+  int octal_row = op_code / 8;
+  switch (octal_col) {
+    case 0:
+      switch(octal_row) {
+        case 0:
+          RET(registers, nz());
+          return;
+        case 1:
+          RET(registers, z());
+          return;
+        case 2:
+          RET(registers, nc());
+          return;
+        case 3:
+          RET(registers, c());
+          return;
+        case 4:
+          LD_MEM(0xFF00 | rd8(registers.PC++), registers.A);
+          return;
+        case 5:
+          ADD_SP(registers, (int8_t ) rd8(registers.PC++));
+          return;
+        case 6:
+          LD(registers.A, rd8(0xFF00  | rd8(registers.PC++)));
+          return;
+        case 7:
+          LD_HL(registers, (int8_t)rd8(registers.PC++));
+          return;
+        default:
+          break;
+      }
+      break;
+    case 1:
+      switch (octal_row) {
+        case 0:
+          POP_16(registers, registers.BC);
+          return;
+        case 1:
+          RET(registers);
+          return;
+        case 2:
+          POP_16(registers, registers.DE);
+          return;
+        case 3:
+          RETI(registers);
+          return;
+        case 4:
+          POP_16(registers, registers.HL);
+          return;
+        case 5:
+          JP_HL(registers);
+          return;
+        case 6:
+          POP_16(registers, registers.AF);
+          return;
+        case 7:
+          LD16(registers.SP, registers.HL);
+          return;
+        default:
+          break;
+      }
+      break;
+    case 3:
+      switch (octal_row) {
+        case 0:
+          JP(registers, imm16(), nz());
+          return;
+        case 1:
+          JP(registers, imm16(), z());
+          return;
+        case 2:
+          JP(registers, imm16(), nc());
+          return;
+        case 3:
+          JP(registers, imm16(), c());
+          return;
+        case 4:
+          LD(registers.A, rd8(0xFF00 + registers.C));
+          return;
+        case 5:
+          LD(registers.A, rd8(imm16()));
+          return;
+        case 6:
+          LD_MEM(0xFF00 + registers.C, registers.A);
+          return;
+        case 7:
+          LD(registers.A, rd8(imm16()));
+          return;
+        default:
+          break;
+      }
+      break;
+    case 4:
+      switch (octal_row) {
+        case 0:
+          JP(registers, imm16());
+          return;
+        case 1:
+          Execute_C0_FF(imm8());
+          return;
+        case 6:
+          DI(registers);
+          return;
+        case 7:
+          EI(registers);
+          return;
+        default:
+          break;
+      }
+      break;
+    case 5:
+      switch (octal_row) {
+        case 0:
+          CALL(registers, imm16(), nz());
+          return;
+        case 1:
+          CALL(registers, imm16(), z());
+          return;
+        case 2:
+          CALL(registers, imm16(), nc());
+          return;
+        case 3:
+          CALL(registers, imm16(), c());
+          return;
+        default:
+          break;
+      }
+      break;
+    case 6:
+      switch (octal_row) {
+        case 0:
+          ADD_A(registers, imm8());
+          return;
+        case 1:
+          ADC(registers, imm8());
+          return;
+        case 2:
+          SUB_A(registers, imm8());
+          return;
+        case 3:
+          SBC_A(registers, imm8());
+          return;
+        case 4:
+          AND_A(registers, imm8());
+          return;
+        case 5:
+          XOR_A(registers, imm8());
+          return;
+        case 6:
+          OR_A(registers, imm8());
+          return;
+        case 7:
+          CP_A(registers, imm8());
+          return;
+        default:
+          break;
+      }
+      break;
+    case 7:
+      RST(registers, 0x8 * octal_row);
       return;
+    default:
+      std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
+      break;
   }
 }
 
@@ -511,6 +763,9 @@ void ProcessInstruction(bool debug) {
       break;
     case 0xBF:
       CP_A(registers, registers.A);
+      break;
+    case 0xC0 ... 0xFF:
+      Execute_C0_FF(op);
       break;
     default:
       std::cerr << "unimplemented op code: 0x" << std::hex << (int) op << std::endl;
