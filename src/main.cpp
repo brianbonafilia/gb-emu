@@ -11,10 +11,8 @@ constexpr char kDebugFlag[] = "--debug";
 int main(int argc, char* argv[]) {
   bool debug = false;
   for (int i = 0; i < argc; i++) {
-    std::cout << argv[i] << std::endl;
     if (std::string(argv[i]) == kDebugFlag) {
       debug = true;
-      std::cout << "debug flag found" << std::endl;
     }
   }
   if (argc < 1) {
@@ -22,8 +20,5 @@ int main(int argc, char* argv[]) {
   }
   Cartridge::load_cartridge(argv[argc - 1]);
   CPU::InitializeRegisters();
-  GUI::Init();
-  while (true) {
-    //CPU::ProcessInstruction(debug);
-  }
+  GUI::Init(debug);
 }

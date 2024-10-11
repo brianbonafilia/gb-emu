@@ -5,14 +5,16 @@
 #include "alu.h"
 #include "cpu.h"
 #include <cstdint>
+#include <iostream>
 namespace CPU {
 
 void ADC(Registers &registers, uint8_t r) {
-  uint8_t A = r + registers.cf;
+  uint8_t A = registers.A + r + registers.cf;
   registers.zf = A == 0;
   registers.cf = A == 0;
   registers.nf = 0;
-  registers.hf = A & 10;
+  registers.hf = (registers.A & 0xF) + (r & 0xF) + registers.cf > 0xF;
+  registers.A = A;
 }
 
 void ADD_A(Registers &registers, uint8_t r) {
@@ -20,7 +22,7 @@ void ADD_A(Registers &registers, uint8_t r) {
   registers.zf = (A & 0xFF) == 0;
   registers.cf = (A >> 8) > 0;
   registers.nf = 0;
-  registers.hf = (0xF & r) + (0xF + registers.A) > 0xF;
+  registers.hf = (0xF & r) + (0xF & registers.A) > 0xF;
   registers.A = 0XFF & A;
 }
 
@@ -33,8 +35,8 @@ void AND_A(Registers &registers, uint8_t r) {
 }
 
 void CP_A(Registers& registers, uint8_t r) {
-  registers.A -= r;
-  registers.zf = registers.A == 0;
+  uint8_t A = registers.A - r;
+  registers.zf = A == 0;
   registers.nf = 1;
   registers.hf = (registers.A & 0xF) < (r & 0xF);
   registers.cf = registers.A < r;
@@ -85,11 +87,10 @@ void XOR_A(Registers& registers, uint8_t r) {
 
 void ADD_HL(Registers& registers, uint16_t r) {
   uint32_t sum = registers.HL + r;
-  registers.zf = sum == 0 || sum == 0x10000;
   registers.nf = 0;
-  registers.hf = (registers.HL & 0xFF) + (r & 0xFF) > 0xFF;
+  registers.hf = (registers.HL & 0xFFF) + (r & 0xFFF) > 0xFFF;
   registers.cf = sum > 0xFFFF;
-  registers.HL = sum;
+  registers.HL = sum & 0xFFFF;
   Tick();
 }
 
@@ -104,17 +105,16 @@ void INC(uint16_t& r) {
 }
 
 void BIT(Registers& registers, uint8_t r, uint8_t bit) {
-  if ((r | (1 <<  bit)) == 0) {
-    registers.zf = 0;
-  }
-  registers.hf = 0;
+  registers.zf = (r & (1 <<  bit)) == 0;
+  registers.nf = 0;
+  registers.hf = 1;
 }
 
-void RES(uint8_t& r, uint8_t bit) {
+void RES(Registers& unused, uint8_t& r, uint8_t bit) {
   r &= ~(1 << bit);
 }
 
-void SET(uint8_t& r, uint8_t bit) {
+void SET(Registers& unused, uint8_t& r, uint8_t bit) {
   r |= 1 << bit;
 }
 
@@ -178,7 +178,7 @@ void SRA(Registers& registers, uint8_t& r) {
   registers.hf = 0;
 }
 
-void SRL(Registers& registers, uint8_t r) {
+void SRL(Registers& registers, uint8_t& r) {
   registers.cf = r & 1;
   r >>= 1;
   registers.zf = r == 0;
@@ -238,7 +238,9 @@ void JR(Registers& registers, int8_t e8) {
   if (e8 < 0) {
     registers.PC -= (uint8_t)(~e8 + 1);
   }
-  registers.PC += e8;
+  else {
+    registers.PC += e8;
+  }
 }
 
 void JR(Registers& registers, int8_t e8, bool cc) {
@@ -266,17 +268,17 @@ void JP_HL(Registers& registers) {
 
 void POP_16(Registers& registers, uint16_t& r16) {
   r16 = rd16(registers.SP);
-  registers.SP -= 2;
+  registers.SP += 2;
 }
 
 void PUSH(Registers& registers, uint16_t r16) {
-  wr8(--registers.SP ,(r16 & 0xFF) >> 8);
+  wr8(--registers.SP ,(r16 & 0xFF00) >> 8);
   wr8(--registers.SP, r16 & 0xFF);
   Tick();
 }
 
 void CALL(Registers& registers, uint16_t addr) {
-  PUSH(registers, ++registers.PC);
+  PUSH(registers, registers.PC);
   registers.PC = addr;
 }
 
@@ -318,11 +320,13 @@ void CPL(Registers& registers) {
 void DAA(Registers& registers) {
   uint8_t low_nibble = registers.A & 0xF;
   uint8_t high_nibble = (registers.A & 0XF0) >> 4;
-  uint8_t correction = 0;
   if (registers.nf == 0) {
-    if (low_nibble > 9 || registers.hf) {
-      registers.A += 0x6;
+    if (low_nibble > 9) {
       high_nibble++;
+      registers.hf = 1;
+    }
+    if (registers.hf) {
+      registers.A += 0x6;
     }
     if (high_nibble > 9 || registers.cf) {
       registers.A += 0x60;

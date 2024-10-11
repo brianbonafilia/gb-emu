@@ -7,10 +7,12 @@
 
 #include <string>
 #include <cstdint>
+#include "cpu.h"
 
 namespace Cartridge {
 
-uint8_t access(uint16_t addr, uint8_t val = 0);
+uint8_t read(uint16_t addr);
+uint8_t write(uint16_t addr, uint8_t val);
 
 void load_cartridge(const char* file_path);
 

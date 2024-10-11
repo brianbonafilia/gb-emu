@@ -7,7 +7,7 @@
 
 namespace GUI {
 
-void Init();
+void Init(bool debug);
 
 }  // namespace
 

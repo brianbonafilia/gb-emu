@@ -37,9 +37,9 @@ void INC(uint16_t& r);
 
 void BIT(Registers& registers, uint8_t r, uint8_t bit);
 
-void RES(uint8_t& r, uint8_t bit);
+void RES(Registers& unused, uint8_t& r, uint8_t bit);
 
-void SET(uint8_t& r, uint8_t bit);
+void SET(Registers& unused, uint8_t& r, uint8_t bit);
 
 void SWAP(Registers& registers, uint8_t& r);
 

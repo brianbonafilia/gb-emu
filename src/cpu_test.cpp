@@ -9,6 +9,7 @@ namespace {
 
 // Demonstrate some basic assertions.
 TEST(CpuTest, ProcessInstruction) {
+  GetRegisters().PC = 0xC000;
   ProcessInstruction(false);
 }
 

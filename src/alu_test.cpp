@@ -27,9 +27,16 @@ TEST(ALU, CarryTest) {
 }
 
 TEST(ALU, ResZerosOutVal) {
+  Registers regs{};
   uint8_t r = 0b1111;
-  RES(r, 2);
+  RES(regs, r, 2);
   EXPECT_EQ(r, 0b1011);
+}
+
+TEST(ALU, JrSubWorks) {
+  Registers r { .PC = 100};
+  JR(r, -10);
+  EXPECT_EQ(r.PC, 90);
 }
 
 TEST(ALU, SwapWorksAsExpected) {
@@ -85,7 +92,40 @@ TEST(ALU, DAA) {
   DAA(r);
   EXPECT_EQ(r.A, 0x68);
 
+  r.F = 0x20;
+  r.A = 0x90;
+  DAA(r);
+  EXPECT_EQ(r.A, 0x96);
+}
 
+TEST(ALU, INC) {
+  Registers r {};
+  r.D = 0x0;
+  r.E = 0xC1;
+
+  INC(r.DE);
+  EXPECT_EQ(r.D, 0);
+  EXPECT_EQ(r.E, 0xC2);
+
+  DEC(r.DE);
+  EXPECT_EQ(r.D, 0);
+  EXPECT_EQ(r.E, 0xC1);
+}
+
+TEST(ALU, CallRet) {
+  Registers r {.SP = 0xFFFE};
+  CALL(r, 0xD000);
+  ASSERT_EQ(r.PC++, 0xD000);
+  RET(r);
+  ASSERT_EQ(r.SP, 0xFFFE);
+}
+
+TEST(ALU, ADC) {
+  Registers r {.A = 0xFF};
+  ADC(r, 0x1);
+  EXPECT_EQ(r.F , 0xB0);
+  EXPECT_EQ(r.A, 0);
+  EXPECT_TRUE(r.hf);
 
 }
 

@@ -55,6 +55,10 @@ struct Registers {
   // Program Counter
   uint16_t PC;
 
+  union {
+    uint8_t IE;
+  };
+
   bool IME;
 };
 

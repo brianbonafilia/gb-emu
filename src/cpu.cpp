@@ -2,13 +2,17 @@
 // Created by Brian Bonafilia on 9/7/24.
 //
 #include <cstdint>
-#include "cpu.h"
-#include "alu.h"
 #include <iostream>
 #include <functional>
+#include <cassert>
+#include "cpu.h"
+#include "alu.h"
+#include "cartridge.h"
 
 namespace CPU {
 namespace {
+
+bool debug = false;
 int tick_count = 0;
 
 Registers registers;
@@ -16,16 +20,26 @@ uint8_t **reg_ind = new uint8_t *[7];
 uint16_t **reg_16ind = new uint16_t *[4];
 // start with 8KiB, will have to update to support GBC banking later
 uint8_t *wram = new uint8_t[0x2000];
+uint8_t *hram = new uint8_t[0x7E];
+bool found_break = false;
+uint16_t next_break = 0xC24A;
 }  //  namespace
 
 template<mode m>
 uint8_t access(uint16_t addr, uint8_t val) {
   switch (addr) {
     case 0x0000 ... 0X3FFF:
-      // fixed bank ram... generally
-      return 0;
+      if (m == read) {
+        return Cartridge::read(addr);
+      }
+      std::cerr << "writing to ROM uh oh" << std::endl;
+      return Cartridge::write(addr, val);
     case 0x4000 ... 0x7FFF:
-      // from cartridge, switchable bank often
+      if (m == read) {
+        return Cartridge::read(addr);
+      }
+      std::cerr << "writing to ROM uh oh" << std::endl;
+      return Cartridge::write(addr, val);
       return 0;
     case 0x8000 ... 0x9FFF:
       // Video RAM
@@ -54,12 +68,22 @@ uint8_t access(uint16_t addr, uint8_t val) {
     case 0xFEA0 ... 0xFEFF:
       // Not usable
       return 0;
-    case 0xFF00 ... 0xFF7F:
-      // I/O registers
+    case 0XFF00:
       return 0;
+    case 0xFF01:
+      std::cout << val;
+      return 0;
+    case 0xFF02 ... 0xFF03:
+      //printf("closer 0x%X\n val 0x%X", addr, val);
+      return 0;
+    case 0xFF04 ... 0xFF7F:
+      return 0x90;
     case 0xFF80 ... 0xFFFE:
       // High RAM
-      return 0;
+      if (m == write) {
+        hram[addr - 0xFF80] = val;
+      }
+      return hram[addr - 0xFF80];
     case 0xFFFF:
       // Interrupt enable register
       return 0;
@@ -68,12 +92,15 @@ uint8_t access(uint16_t addr, uint8_t val) {
 }
 
 uint8_t imm8() {
-  return rd8(registers.PC++);
+  uint8_t val = rd8(registers.PC++);
+//  printf("read imm val 0x%X \n", val);
+  return val;
 }
 
 uint16_t imm16() {
   uint16_t  val = rd16(registers.PC);
   registers.PC += 2;
+//  printf("read imm val 0x%X \n", val);
   return val;
 }
 
@@ -89,6 +116,7 @@ uint8_t rd8(uint16_t addr) {
 }
 
 uint8_t wr8(uint16_t addr, uint8_t val) {
+  //printf("Writing  0x%X to 0x%X \n", val, addr);
   Tick();
   return access<write>(addr, val);
 }
@@ -99,16 +127,16 @@ void Tick() {
 
 void InitializeRegisters() {
   registers.A = 0x01;
-  registers.zf = 0;
+  registers.zf = 1;
   registers.nf = 0;
-  registers.hf = 0;
-  registers.cf = 0;
-  registers.B = 0xFF;
+  registers.hf = 1;
+  registers.cf = 1;
+  registers.B = 0x00;
   registers.C = 0x13;
   registers.D = 0x00;
-  registers.E = 0xC1;
-  registers.H = 0x84;
-  registers.L = 0x03;
+  registers.E = 0xD8;
+  registers.H = 0x01;
+  registers.L = 0x4D;
   registers.PC = 0x0100;
   registers.SP = 0xFFFE;
 
@@ -155,8 +183,94 @@ bool c() {
   return registers.cf;
 }
 
-void Execute_CB_Prefixed(uint8_t op_code) {
+template <typename T>
+void performOpOnHl(T op) {
+  uint8_t HL = rd8(registers.HL);
+  op(registers, HL);
+  wr8(registers.HL, HL);
+}
 
+template<typename T>
+void handleOctalOpPattern(T op, int octal_col) {
+  switch (octal_col) {
+    case 0 ... 5:
+      op(registers, *reg_ind[octal_col]);
+      return;
+    case 6: {
+      performOpOnHl(op);
+      return;
+    }
+    case 7:
+      op(registers, registers.A);
+      return;
+    default:
+      break;
+  }
+}
+
+template <typename T>
+void performOpOnHl(T op, int bit) {
+  uint8_t HL = rd8(registers.HL);
+  op(registers, HL, bit);
+  wr8(registers.HL, HL);
+}
+
+template<typename T>
+void handleOctalOpPattern(T op, int bit, int octal_col) {
+  switch (octal_col) {
+    case 0 ... 5:
+      op(registers, *reg_ind[octal_col], bit);
+      return;
+    case 6: {
+      performOpOnHl(op, bit);
+      return;
+    }
+    case 7:
+      op(registers, registers.A, bit);
+      return;
+    default:
+      break;
+  }
+}
+
+void Execute_CB_Prefixed(uint8_t op_code) {
+  int octal_row = op_code / 8;
+  int octal_col = op_code % 8;
+  switch (octal_row) {
+    case 0:
+      handleOctalOpPattern(RLC, octal_col);
+      return;
+    case 1:
+      handleOctalOpPattern(RRC, octal_col);
+      return;
+    case 2:
+      handleOctalOpPattern(RL, octal_col);
+      return;
+    case 3:
+      handleOctalOpPattern(RR, octal_col);
+      return;
+    case 4:
+      handleOctalOpPattern(SLA,  octal_col);
+      return;
+    case 5:
+      handleOctalOpPattern(SRA, octal_col);
+      return;
+    case 6:
+      handleOctalOpPattern(SWAP, octal_col);
+      return;
+    case 7:
+      handleOctalOpPattern(SRL, octal_col);
+      return;
+    case 0x8 ... 0xF:
+      handleOctalOpPattern(BIT, octal_row - 0x8, octal_col);
+      return;
+    case 0x10 ... 0x17:
+      handleOctalOpPattern(RES, octal_row - 0x10, octal_col);
+      return;
+    case 0x18 ... 0x1F:
+      handleOctalOpPattern(SET, octal_row - 0x18, octal_col);
+      return;
+  }
 }
 
 void Execute_00_3F(uint8_t op_code) {
@@ -186,6 +300,7 @@ void Execute_00_3F(uint8_t op_code) {
           return;
         case 7:
           JR(registers, (int8_t) rd8(registers.PC++), c());
+          return;
         default:
           break;
       }
@@ -252,8 +367,9 @@ void Execute_00_3F(uint8_t op_code) {
       break;
     case 3:
     {
-      std::function<void(uint16_t &)> index_func = (op_code / 8) % 2 ? DEC : INC;
-      index_func(*reg_16ind[(op_code % 8) / 2]);
+      std::function<void(uint16_t &)> index_func = (op_code / 8) % 2  == 0 ? INC : DEC;
+      index_func(*reg_16ind[(op_code / 8) / 2]);
+      return;
     }
     case 4 ... 5:
     {
@@ -281,13 +397,13 @@ void Execute_00_3F(uint8_t op_code) {
     case 6:
       switch (op_code / 8) {
         case 0 ... 5:
-          LD(*reg_ind[op_code / 8], rd8(registers.PC++));
+          LD(*reg_ind[op_code / 8], imm8());
           return;
         case 6:
-          LD_MEM(registers.HL, rd8(registers.PC++));
+          LD_MEM(registers.HL, imm8());
           return;
         case 7:
-          LD(registers.A, rd8(registers.PC++));
+          LD(registers.A, imm8());
           return;
         default:
           break;
@@ -297,15 +413,19 @@ void Execute_00_3F(uint8_t op_code) {
       switch (op_code / 8) {
         case 0:
           RLC(registers, registers.A);
+          registers.zf = 0;
           return;
         case 1:
           RRC(registers, registers.A);
+          registers.zf = 0;
           return;
         case 2:
           RL(registers, registers.A);
+          registers.zf = 0;
           return;
         case 3:
           RR(registers, registers.A);
+          registers.zf = 0;
           return;
         case 4:
           DAA(registers);
@@ -323,12 +443,12 @@ void Execute_00_3F(uint8_t op_code) {
           break;
       }
   }
-  std::cerr << "got a bad op code 0x" << std::hex << (int) op_code;
+  std::cerr << "got a bad op code 0x" << std::hex << (int) op_code << std::endl;
 }
 
 void Execute_C0_FF(uint8_t op_code) {
   int octal_col = op_code % 8;
-  int octal_row = op_code / 8;
+  int octal_row = (op_code / 8) - 24;
   switch (octal_col) {
     case 0:
       switch(octal_row) {
@@ -382,6 +502,7 @@ void Execute_C0_FF(uint8_t op_code) {
           return;
         case 6:
           POP_16(registers, registers.AF);
+          registers.AF &= 0xFFF0;
           return;
         case 7:
           LD16(registers.SP, registers.HL);
@@ -390,7 +511,7 @@ void Execute_C0_FF(uint8_t op_code) {
           break;
       }
       break;
-    case 3:
+    case 2:
       switch (octal_row) {
         case 0:
           JP(registers, imm16(), nz());
@@ -405,13 +526,13 @@ void Execute_C0_FF(uint8_t op_code) {
           JP(registers, imm16(), c());
           return;
         case 4:
-          LD(registers.A, rd8(0xFF00 + registers.C));
+          LD_MEM(rd8(0xFF00 + (uint16_t)registers.C), registers.A);
           return;
         case 5:
-          LD(registers.A, rd8(imm16()));
+          LD_MEM(imm16(), registers.A);
           return;
         case 6:
-          LD_MEM(0xFF00 + registers.C, registers.A);
+          LD(registers.A, rd8(0xFF00 + (uint16_t)registers.C));
           return;
         case 7:
           LD(registers.A, rd8(imm16()));
@@ -420,13 +541,14 @@ void Execute_C0_FF(uint8_t op_code) {
           break;
       }
       break;
-    case 4:
+    case 3:
+
       switch (octal_row) {
         case 0:
           JP(registers, imm16());
           return;
         case 1:
-          Execute_C0_FF(imm8());
+          Execute_CB_Prefixed(imm8());
           return;
         case 6:
           DI(registers);
@@ -438,7 +560,7 @@ void Execute_C0_FF(uint8_t op_code) {
           break;
       }
       break;
-    case 5:
+    case 4:
       switch (octal_row) {
         case 0:
           CALL(registers, imm16(), nz());
@@ -451,6 +573,27 @@ void Execute_C0_FF(uint8_t op_code) {
           return;
         case 3:
           CALL(registers, imm16(), c());
+          return;
+        default:
+          break;
+      }
+      break;
+    case 5:
+      switch (octal_row) {
+        case 0:
+          PUSH(registers, registers.BC);
+          return;
+        case 1:
+          CALL(registers, imm16());
+          return;
+        case 2:
+          PUSH(registers, registers.DE);
+          return;
+        case 4:
+          PUSH(registers, registers.HL);
+          return;
+        case 6:
+          PUSH(registers, registers.AF & 0xFFF0);
           return;
         default:
           break;
@@ -493,17 +636,77 @@ void Execute_C0_FF(uint8_t op_code) {
       std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
       break;
   }
+  std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
 }
 
 void ProcessInstruction(bool debug) {
   if (debug) {
-    std::cout << tick_count << std::endl;
+    printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n",
+           registers.A,
+           registers.F,
+           registers.B,
+           registers.C,
+           registers.D,
+           registers.E,
+           registers.H,
+           registers.L,
+           registers.SP,
+           registers.PC,
+           access<read>(registers.PC),
+           access<read>(registers.PC + 1),
+           access<read>(registers.PC + 2),
+           access<read>(registers.PC + 3));
+    if (found_break || registers.PC == next_break) {
+      found_break = true;
+      std::cin.ignore();
+    }
   }
   uint8_t op = rd8(registers.PC++);
   switch (op) {
-    case 0x00 ... 0x3F:
+    case 0x00:
+      break;
+    case 0x01 ... 0x3F:
       Execute_00_3F(op);
       break;
+//    case 0x01:
+//      LD16(registers.BC, imm16());
+//      break;
+//    case 0x02:
+//      LD_MEM(registers.BC, registers.A);
+//      break;
+//    case 03:
+//      INC(registers.BC);
+//      break;
+//    case 0x04:
+//      INC_8(registers, registers.B);
+//      break;
+//    case 0x05:
+//      DEC_8(registers, registers.B);
+//      break;
+//    case 0x06:
+//      LD(registers.B, imm8());
+//      return;
+//    case 0x07:
+//      RLC(registers, registers.A);
+//      break;
+//    case 0x08:
+//      LD_SP_TO_MEM(registers, imm16());
+//      break;
+//    case 0x09:
+//      ADD_HL(registers, registers.BC);
+//      break;
+//    case 0x0A:
+//      LD(registers.A, rd8(registers.BC));
+//      break;
+//    case 0x0B:
+//      DEC(registers.BC);
+//      break;
+//    case 0x0C:
+//      INC_8(registers, registers.C);
+
+
+
+
     case 0x40 ... 0x45:
       LD(registers.B, *reg_ind[op - 0x40]);
       break;
@@ -512,11 +715,15 @@ void ProcessInstruction(bool debug) {
       break;
     case 0x47:
       LD(registers.B, registers.A);
+      break;
     case 0x48 ... 0x4D:
-      LD(registers.C, *reg_ind[op - 0x40]);
+      LD(registers.C, *reg_ind[op - 0x48]);
       break;
     case 0x4E:
       LD(registers.C, rd8(registers.HL));
+      break;
+    case 0x4F:
+      LD(registers.C, registers.A);
       break;
     case 0x50 ... 0x55:
       LD(registers.D, *reg_ind[op - 0x50]);

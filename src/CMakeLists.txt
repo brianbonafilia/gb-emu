@@ -1,7 +1,7 @@
 set(CMAKE_CXX_STANDARD 17)
 add_library(cpu cpu.cpp cpu.h
         cartridge.cpp
-        cartridge.h alu.cpp alu.h)
+        cartridge.h alu.cpp alu.h mapper.cpp)
 
 set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mapper.cpp
@@ -36,11 +36,11 @@ FetchContent_MakeAvailable(SDL2)
 enable_testing()
 
 add_executable(
-        cpu_test cpu_test.cpp cpu alu.cpp
+        cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
-        alu_test.cpp)
+        alu_test.cpp mapper.cpp cartridge.cpp)
 
 target_link_libraries(
         gb_emu
