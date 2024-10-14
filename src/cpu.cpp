@@ -21,8 +21,9 @@ uint16_t **reg_16ind = new uint16_t *[4];
 // start with 8KiB, will have to update to support GBC banking later
 uint8_t *wram = new uint8_t[0x2000];
 uint8_t *hram = new uint8_t[0x7E];
+uint8_t *serial_port = new uint8_t[0x2];
 bool found_break = false;
-uint16_t next_break = 0xC24A;
+uint16_t next_break = 12;
 }  //  namespace
 
 template<mode m>
@@ -71,10 +72,19 @@ uint8_t access(uint16_t addr, uint8_t val) {
     case 0XFF00:
       return 0;
     case 0xFF01:
-      std::cout << val;
-      return 0;
-    case 0xFF02 ... 0xFF03:
-      //printf("closer 0x%X\n val 0x%X", addr, val);
+      if (m == write) {
+        serial_port[0] = val;
+      }
+      return serial_port[0];
+    case 0xFF02:
+      if (m == write) {
+        serial_port[1] = val;
+        if (val == 0x81) {
+          std::cout << serial_port[0];
+        }
+      }
+    case 0xFF03:
+      // unknown at the moment
       return 0;
     case 0xFF04 ... 0xFF7F:
       return 0x90;
@@ -98,7 +108,7 @@ uint8_t imm8() {
 }
 
 uint16_t imm16() {
-  uint16_t  val = rd16(registers.PC);
+  uint16_t val = rd16(registers.PC);
   registers.PC += 2;
 //  printf("read imm val 0x%X \n", val);
   return val;
@@ -112,11 +122,12 @@ uint16_t rd16(uint16_t addr) {
 
 uint8_t rd8(uint16_t addr) {
   Tick();
+//  printf("reading from %X \n", addr);
   return access<read>(addr);
 }
 
 uint8_t wr8(uint16_t addr, uint8_t val) {
-  //printf("Writing  0x%X to 0x%X \n", val, addr);
+//  printf("Writing  0x%X to 0x%X \n", val, addr);
   Tick();
   return access<write>(addr, val);
 }
@@ -183,7 +194,7 @@ bool c() {
   return registers.cf;
 }
 
-template <typename T>
+template<typename T>
 void performOpOnHl(T op) {
   uint8_t HL = rd8(registers.HL);
   op(registers, HL);
@@ -208,7 +219,7 @@ void handleOctalOpPattern(T op, int octal_col) {
   }
 }
 
-template <typename T>
+template<typename T>
 void performOpOnHl(T op, int bit) {
   uint8_t HL = rd8(registers.HL);
   op(registers, HL, bit);
@@ -250,7 +261,7 @@ void Execute_CB_Prefixed(uint8_t op_code) {
       handleOctalOpPattern(RR, octal_col);
       return;
     case 4:
-      handleOctalOpPattern(SLA,  octal_col);
+      handleOctalOpPattern(SLA, octal_col);
       return;
     case 5:
       handleOctalOpPattern(SRA, octal_col);
@@ -279,9 +290,12 @@ void Execute_00_3F(uint8_t op_code) {
       switch (op_code / 8) {
         case 0:
           return;
-        case 1:
-          LD_MEM(imm16(), registers.SP);
+        case 1: {
+          uint16_t addr = imm16();
+          LD_MEM(addr, registers.SP & 0XFF);
+          LD_MEM(addr + 1, (registers.SP & 0xFF00) >> 8);
           return;
+        }
         case 2:
           // TODO: STOP
           std::cerr << "was supposed to stop but didnt" << std::endl;
@@ -365,16 +379,14 @@ void Execute_00_3F(uint8_t op_code) {
           break;
       }
       break;
-    case 3:
-    {
-      std::function<void(uint16_t &)> index_func = (op_code / 8) % 2  == 0 ? INC : DEC;
+    case 3: {
+      std::function<void(uint16_t &)> index_func = (op_code / 8) % 2 == 0 ? INC : DEC;
       index_func(*reg_16ind[(op_code / 8) / 2]);
       return;
     }
-    case 4 ... 5:
-    {
+    case 4 ... 5: {
       std::function<void(Registers &, uint8_t &)> ind_func = op_code % 8 == 4 ?
-                                                              INC_8 : DEC_8;
+                                                             INC_8 : DEC_8;
       int val = op_code / 8;
       switch (val) {
         case 0 ... 5:
@@ -451,7 +463,7 @@ void Execute_C0_FF(uint8_t op_code) {
   int octal_row = (op_code / 8) - 24;
   switch (octal_col) {
     case 0:
-      switch(octal_row) {
+      switch (octal_row) {
         case 0:
           RET(registers, nz());
           return;
@@ -468,13 +480,13 @@ void Execute_C0_FF(uint8_t op_code) {
           LD_MEM(0xFF00 | rd8(registers.PC++), registers.A);
           return;
         case 5:
-          ADD_SP(registers, (int8_t ) rd8(registers.PC++));
+          ADD_SP(registers, (int8_t) rd8(registers.PC++));
           return;
         case 6:
-          LD(registers.A, rd8(0xFF00  | rd8(registers.PC++)));
+          LD(registers.A, rd8(0xFF00 | rd8(registers.PC++)));
           return;
         case 7:
-          LD_HL(registers, (int8_t)rd8(registers.PC++));
+          LD_HL(registers, (int8_t) rd8(registers.PC++));
           return;
         default:
           break;
@@ -526,13 +538,13 @@ void Execute_C0_FF(uint8_t op_code) {
           JP(registers, imm16(), c());
           return;
         case 4:
-          LD_MEM(rd8(0xFF00 + (uint16_t)registers.C), registers.A);
+          LD_MEM(rd8(0xFF00 + (uint16_t) registers.C), registers.A);
           return;
         case 5:
           LD_MEM(imm16(), registers.A);
           return;
         case 6:
-          LD(registers.A, rd8(0xFF00 + (uint16_t)registers.C));
+          LD(registers.A, rd8(0xFF00 + (uint16_t) registers.C));
           return;
         case 7:
           LD(registers.A, rd8(imm16()));
@@ -641,21 +653,22 @@ void Execute_C0_FF(uint8_t op_code) {
 
 void ProcessInstruction(bool debug) {
   if (debug) {
-    printf("A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n",
-           registers.A,
-           registers.F,
-           registers.B,
-           registers.C,
-           registers.D,
-           registers.E,
-           registers.H,
-           registers.L,
-           registers.SP,
-           registers.PC,
-           access<read>(registers.PC),
-           access<read>(registers.PC + 1),
-           access<read>(registers.PC + 2),
-           access<read>(registers.PC + 3));
+    printf(
+        "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n",
+        registers.A,
+        registers.F,
+        registers.B,
+        registers.C,
+        registers.D,
+        registers.E,
+        registers.H,
+        registers.L,
+        registers.SP,
+        registers.PC,
+        access<read>(registers.PC),
+        access<read>(registers.PC + 1),
+        access<read>(registers.PC + 2),
+        access<read>(registers.PC + 3));
     if (found_break || registers.PC == next_break) {
       found_break = true;
       std::cin.ignore();

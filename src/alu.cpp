@@ -11,9 +11,9 @@ namespace CPU {
 void ADC(Registers &registers, uint8_t r) {
   uint8_t A = registers.A + r + registers.cf;
   registers.zf = A == 0;
-  registers.cf = A == 0;
   registers.nf = 0;
   registers.hf = (registers.A & 0xF) + (r & 0xF) + registers.cf > 0xF;
+  registers.cf = registers.A + r + registers.cf > 0xFF;
   registers.A = A;
 }
 
@@ -74,8 +74,12 @@ void SUB_A(Registers& registers, uint8_t r) {
 }
 
 void SBC_A(Registers& registers, uint8_t r) {
-  SUB_A(registers, r + registers.cf);
-}
+  uint8_t A = registers.A - (r + registers.cf);
+  registers.zf = A == 0;
+  registers.nf = 1;
+  registers.hf = (registers.A & 0xF) < (r & 0xF) + registers.cf;
+  registers.cf = r + registers.cf > registers.A;
+  registers.A = A;}
 
 void XOR_A(Registers& registers, uint8_t r) {
   registers.A ^= r;
@@ -204,13 +208,11 @@ void LD_SP_TO_MEM(Registers& registers, uint16_t addr) {
 }
 
 void LD_HL(Registers& registers, int8_t e8) {
+  registers.cf = (registers.SP & 0xFF) + ((uint8_t) e8 & 0xFF) > 0xFF;
+  registers.hf = (registers.SP & 0xF) + ((uint8_t) e8 & 0xF) > 0xF;
   if (e8 < 0) {
     registers.HL = registers.SP - (uint8_t)(~(e8) + 1);
   } else {
-    uint8_t nibble = (0xF & registers.SP) + (0xF & e8);
-    registers.hf = nibble > 0xF;
-    uint16_t byte = (uint8_t) e8 + (registers.SP & 0xFF);
-    registers.cf = byte > 0xFF;
     registers.HL = registers.SP + (uint8_t) e8;
   }
   registers.zf = 0;
@@ -219,13 +221,11 @@ void LD_HL(Registers& registers, int8_t e8) {
 }
 
 void ADD_SP(Registers& registers, int8_t e8) {
+  registers.cf = (registers.SP & 0xFF) + ((uint8_t) e8 & 0xFF) > 0xFF;
+  registers.hf = (registers.SP & 0xF) + ((uint8_t) e8 & 0xF) > 0xF;
   if (e8 < 0) {
     registers.SP -= (uint8_t)(~(e8) + 1);
   } else {
-    uint8_t nibble = (0xF & registers.SP) + (0xF & e8);
-    registers.hf = nibble > 0xF;
-    uint16_t byte = (uint8_t) e8 + (registers.SP & 0xFF);
-    registers.cf = byte > 0xFF;
     registers.SP += (uint8_t) e8;
   }
   Tick(); Tick();
@@ -289,7 +289,8 @@ void CALL(Registers& registers, uint16_t addr, bool cc) {
 }
 
 void RST(Registers& registers, uint8_t vec) {
-  wr8(registers.SP++, ++registers.PC);
+  wr8(--registers.SP, (registers.PC & 0xFF00) >> 8);
+  wr8(--registers.SP, registers.PC & 0xFF);
   registers.PC = vec;
 }
 
@@ -311,10 +312,14 @@ void RETI(Registers& registers) {
 
 void CCF(Registers& registers) {
   registers.cf = ~registers.cf;
+  registers.nf = 0;
+  registers.hf = 0;
 }
 
 void CPL(Registers& registers) {
   registers.A = ~registers.A;
+  registers.nf = 1;
+  registers.hf = 1;
 }
 
 void DAA(Registers& registers) {
@@ -359,6 +364,8 @@ void HALT(Registers& registers) {
 
 void SCF(Registers& registers) {
   registers.cf = 1;
+  registers.nf = 0;
+  registers.hf = 0;
 }
 
 void STOP(Registers& registers) {

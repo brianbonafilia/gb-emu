@@ -127,6 +127,27 @@ TEST(ALU, ADC) {
   EXPECT_EQ(r.A, 0);
   EXPECT_TRUE(r.hf);
 
+  r.A = 0x10;
+  r.F = 0;
+  ADC(r, 0xFF);
+  EXPECT_EQ(r.A, 0x0F);
+  EXPECT_EQ(r.F, 0x10);
 }
+
+TEST(ALU, SBC) {
+  Registers r {.A = 00, .cf = 1};
+  SBC_A(r, 0x0F);
+
+  EXPECT_EQ(r.A, 0xF0);
+  EXPECT_EQ(r.F, 0x70);
+}
+
+TEST(ALU, AddSPe8) {
+  Registers r {.SP = 0xDEFB};
+  ADD_SP(r, (int8_t) 0xFF);
+  ASSERT_EQ(r.SP, 0xDEFA);
+  ASSERT_EQ(r.F, 0x30);
+}
+
 
 }  /// namespace
