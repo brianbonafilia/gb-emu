@@ -23,7 +23,7 @@ uint8_t *wram = new uint8_t[0x2000];
 uint8_t *hram = new uint8_t[0x7E];
 uint8_t *serial_port = new uint8_t[0x2];
 bool found_break = false;
-uint16_t next_break = 12;
+uint16_t next_break = 0xC6A0;
 }  //  namespace
 
 template<mode m>
@@ -33,15 +33,14 @@ uint8_t access(uint16_t addr, uint8_t val) {
       if (m == read) {
         return Cartridge::read(addr);
       }
-      std::cerr << "writing to ROM uh oh" << std::endl;
+      std::cerr << "writing to ROM uh oh " << std::hex << (int) addr  << " val " << std::hex << (int) val << std::endl;
       return Cartridge::write(addr, val);
     case 0x4000 ... 0x7FFF:
       if (m == read) {
         return Cartridge::read(addr);
       }
-      std::cerr << "writing to ROM uh oh" << std::endl;
+      std::cerr << "writing to ROM uh oh " << std::hex << (int) addr  << " val " << std::hex << (int) val << std::endl;
       return Cartridge::write(addr, val);
-      return 0;
     case 0x8000 ... 0x9FFF:
       // Video RAM
       return 0;
@@ -373,7 +372,7 @@ void Execute_00_3F(uint8_t op_code) {
           LD_MEM(registers.HL--, registers.A);
           return;
         case 7:
-          LD(registers.A, registers.HL--);
+          LD(registers.A, rd8(registers.HL--));
           return;
         default:
           break;
@@ -538,7 +537,7 @@ void Execute_C0_FF(uint8_t op_code) {
           JP(registers, imm16(), c());
           return;
         case 4:
-          LD_MEM(rd8(0xFF00 + (uint16_t) registers.C), registers.A);
+          LD_MEM(0xFF00 | registers.C, registers.A);
           return;
         case 5:
           LD_MEM(imm16(), registers.A);
@@ -669,10 +668,10 @@ void ProcessInstruction(bool debug) {
         access<read>(registers.PC + 1),
         access<read>(registers.PC + 2),
         access<read>(registers.PC + 3));
-    if (found_break || registers.PC == next_break) {
-      found_break = true;
-      std::cin.ignore();
-    }
+//    if (registers.PC == next_break && registers.A == 0xDF && registers.L == 0x1C) {
+////      found_break = true;
+//      std::cin.ignore();
+//    }
   }
   uint8_t op = rd8(registers.PC++);
   switch (op) {
@@ -681,45 +680,6 @@ void ProcessInstruction(bool debug) {
     case 0x01 ... 0x3F:
       Execute_00_3F(op);
       break;
-//    case 0x01:
-//      LD16(registers.BC, imm16());
-//      break;
-//    case 0x02:
-//      LD_MEM(registers.BC, registers.A);
-//      break;
-//    case 03:
-//      INC(registers.BC);
-//      break;
-//    case 0x04:
-//      INC_8(registers, registers.B);
-//      break;
-//    case 0x05:
-//      DEC_8(registers, registers.B);
-//      break;
-//    case 0x06:
-//      LD(registers.B, imm8());
-//      return;
-//    case 0x07:
-//      RLC(registers, registers.A);
-//      break;
-//    case 0x08:
-//      LD_SP_TO_MEM(registers, imm16());
-//      break;
-//    case 0x09:
-//      ADD_HL(registers, registers.BC);
-//      break;
-//    case 0x0A:
-//      LD(registers.A, rd8(registers.BC));
-//      break;
-//    case 0x0B:
-//      DEC(registers.BC);
-//      break;
-//    case 0x0C:
-//      INC_8(registers, registers.C);
-
-
-
-
     case 0x40 ... 0x45:
       LD(registers.B, *reg_ind[op - 0x40]);
       break;
