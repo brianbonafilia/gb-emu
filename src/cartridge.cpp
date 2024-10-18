@@ -7,6 +7,7 @@
 #include <iostream>
 #include "mapper.h"
 #include "cpu.h"
+#include "mappers/mbc1.h"
 
 namespace Cartridge {
 
@@ -31,7 +32,6 @@ void load_cartridge(const char *file_path) {
   fseek(file, 0, SEEK_SET);
 
   data = new uint8_t[size];
-  mapper = new Mapper(data);
   size_t bytes_read = fread(data, 1, size, file);
   if (bytes_read  < size) {
     std::cerr << "Failed to read from the file with error code" << std::endl;
@@ -42,9 +42,21 @@ void load_cartridge(const char *file_path) {
   int rom_size = data[0x148];
   int ram_size = data[0x149];
 
-  std::cout << "the cartridge type is " << std::hex << cartride_type << std::endl;
-  std::cout << "rom size is " << std::hex << rom_size << std::endl;
-  std::cout << "ram size is " << std::hex << ram_size << std::endl;
+  switch (cartride_type) {
+    case 0:
+      mapper = new Mapper(data);
+      break;
+    case 1:
+      mapper = new MBC1(data);
+      break;
+    default:
+      std::cerr << "mapper type not supported: Mapper " << cartride_type << std::endl;
+  }
+
+
+//  std::cout << "the cartridge type is " << std::hex << cartride_type << std::endl;
+//  std::cout << "rom size is " << std::hex << rom_size << std::endl;
+//  std::cout << "ram size is " << std::hex << ram_size << std::endl;
 
 }
 }  // namespace Cartridge

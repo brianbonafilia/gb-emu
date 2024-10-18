@@ -22,6 +22,7 @@ uint16_t **reg_16ind = new uint16_t *[4];
 uint8_t *wram = new uint8_t[0x2000];
 uint8_t *hram = new uint8_t[0x7E];
 uint8_t *serial_port = new uint8_t[0x2];
+
 bool found_break = false;
 uint16_t next_break = 0xC6A0;
 }  //  namespace
@@ -33,13 +34,11 @@ uint8_t access(uint16_t addr, uint8_t val) {
       if (m == read) {
         return Cartridge::read(addr);
       }
-      std::cerr << "writing to ROM uh oh " << std::hex << (int) addr  << " val " << std::hex << (int) val << std::endl;
       return Cartridge::write(addr, val);
     case 0x4000 ... 0x7FFF:
       if (m == read) {
         return Cartridge::read(addr);
       }
-      std::cerr << "writing to ROM uh oh " << std::hex << (int) addr  << " val " << std::hex << (int) val << std::endl;
       return Cartridge::write(addr, val);
     case 0x8000 ... 0x9FFF:
       // Video RAM
@@ -85,7 +84,34 @@ uint8_t access(uint16_t addr, uint8_t val) {
     case 0xFF03:
       // unknown at the moment
       return 0;
-    case 0xFF04 ... 0xFF7F:
+    case 0xFF04:
+      if (m == write) {
+        registers.DIV = 0;
+      }
+      return registers.DIV;
+    case 0xFF05:
+      if (m == write) {
+        registers.TIMA = val;
+      }
+      return registers.TIMA;
+    case 0xFF06:
+      if (m == write) {
+        registers.TMA = val;
+      }
+      return registers.TMA;
+    case 0xFF07:
+      if (m == write) {
+        registers.TAC = val;
+      }
+      return registers.TAC;
+    case 0xFF08 ... 0xFF0E:
+      return 0x90;
+    case 0xFF0F:
+      if (m == write) {
+        registers.IF = val;
+      }
+      return registers.IF;
+    case 0xFF10 ... 0xFF7F:
       return 0x90;
     case 0xFF80 ... 0xFFFE:
       // High RAM
@@ -94,8 +120,10 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return hram[addr - 0xFF80];
     case 0xFFFF:
-      // Interrupt enable register
-      return 0;
+      if (m == write) {
+        registers.IE = val;
+      }
+      return registers.IE;
   }
   return 0;
 }
@@ -131,11 +159,47 @@ uint8_t wr8(uint16_t addr, uint8_t val) {
   return access<write>(addr, val);
 }
 
+// TODO: evaluate running 4 M-cycles instead of one 4 cycle tick.
 void Tick() {
+  registers.DIV++;
+  if (registers.timer_enable) {
+    switch (registers.clock_select) {
+      case 0x0:
+        if (registers.DIV % 256 == 0) {
+          registers.TIMA++;
+        }
+        break;
+      case 0x1:
+        if (registers.DIV % 4 == 0)
+        registers.TIMA++;
+        break;
+      case 0x2:
+        if (registers.DIV % 16 == 0) {
+          registers.TIMA++;
+        }
+        break;
+      case 0x3:
+        if (registers.DIV % 64 == 0) {
+          registers.TIMA++;
+        }
+        break;
+    }
+    // Overflow occurred, presumably
+    if (registers.TIMA == 0x0) {
+//      printf("OK i think i should be interrupting my dude");
+        registers.TIMA = registers.TMA;
+        registers.time_if = true;
+//        printf("hmm doggie, IF: %X IE: %X TMA %X IME %X, clock select %X timer enable: %X", \
+//            registers.IF, registers.IE, registers.TMA, registers.IME, registers.clock_select, registers.timer_enable);
+
+    }
+  }
+
   tick_count++;
 }
 
 void InitializeRegisters() {
+  // CPU registers
   registers.A = 0x01;
   registers.zf = 1;
   registers.nf = 0;
@@ -149,6 +213,17 @@ void InitializeRegisters() {
   registers.L = 0x4D;
   registers.PC = 0x0100;
   registers.SP = 0xFFFE;
+
+  // Timer registers
+  registers.DIV = 0xAB;
+  registers.TIMA = 0x00;
+  registers.TAC = 0xF8;
+
+  //Flag registers
+  registers.IF = 0xE1;
+  registers.IE = 0x00;
+  registers.IME = false;
+  registers.halt = false;
 
   reg_ind[0] = &registers.B;
   reg_ind[1] = &registers.C;
@@ -650,7 +725,36 @@ void Execute_C0_FF(uint8_t op_code) {
   std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
 }
 
+void HandleInterrupt() {
+  registers.PC--;
+  uint16_t intr_addr = 0;
+  uint8_t interrupt = registers.IF & registers.IE;
+  if (interrupt & 0x1) {
+    intr_addr = 0x40;
+  } else if (interrupt & 0x2) {
+    intr_addr = 0x48;
+  } else if (interrupt & 0x4) {
+    intr_addr = 0x50;
+  } else if (interrupt & 0x8) {
+    intr_addr = 0x58;
+  } else if (interrupt & 0x1) {
+    intr_addr = 0x60;
+  }
+  registers.IF = 0;
+  registers.IME = false;
+  CALL(registers, intr_addr);
+  Tick();
+}
+
 void ProcessInstruction(bool debug) {
+  if ((registers.IE & registers.IF) > 0) {
+    registers.halt = false;
+    if (registers.IME) {
+      rd8(registers.PC++);
+      HandleInterrupt();
+      return;
+    }
+  }
   if (debug) {
     printf(
         "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n",
@@ -672,6 +776,10 @@ void ProcessInstruction(bool debug) {
 ////      found_break = true;
 //      std::cin.ignore();
 //    }
+  }
+  if (registers.halt) {
+    Tick();
+    return;
   }
   uint8_t op = rd8(registers.PC++);
   switch (op) {
@@ -738,7 +846,7 @@ void ProcessInstruction(bool debug) {
       LD_MEM(registers.HL, *reg_ind[op - 0x70]);
       break;
     case 0x76:
-      // TODO: HALT
+      registers.halt = true;
       break;
     case 0x77:
       LD_MEM(registers.HL, registers.A);

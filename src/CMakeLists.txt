@@ -8,6 +8,8 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mapper.h
         gui.cpp
         gui.h
+        mappers/mbc1.cpp
+        mappers/mbc1.h
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
@@ -36,11 +38,11 @@ FetchContent_MakeAvailable(SDL2)
 enable_testing()
 
 add_executable(
-        cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp
+        cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
-        alu_test.cpp mapper.cpp cartridge.cpp)
+        alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp)
 
 target_link_libraries(
         gb_emu

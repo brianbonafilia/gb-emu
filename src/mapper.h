@@ -9,7 +9,7 @@
 
 class Mapper {
  public:
-  Mapper(uint8_t* rom);
+  explicit Mapper(uint8_t* rom);
   // Pass in the addr assume starts at 0
   virtual uint8_t read(uint16_t addr);
   virtual uint8_t write(uint16_t addr, uint8_t val);

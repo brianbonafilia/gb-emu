@@ -55,10 +55,46 @@ struct Registers {
   // Program Counter
   uint16_t PC;
 
+  // Divider register,
+  uint16_t DIV;
+  // Timer counter
+  uint8_t TIMA;
+  // Timer modulo
+  uint8_t TMA;
+  // Timer control
   union {
+    struct {
+      uint8_t clock_select: 2;
+      uint8_t timer_enable: 1;
+      uint8_t : 5;
+    };
+    uint8_t TAC;
+  };
+
+  // Interrupt Enable
+  union {
+    struct {
+      bool v_blank_ie: 1;
+      bool lcd_ie: 1;
+      bool time_ie: 1;
+      bool joypad_ie: 1;
+      uint8_t : 4;
+    };
     uint8_t IE;
   };
 
+  union {
+    struct {
+      bool v_blank_if: 1;
+      bool lcd_if: 1;
+      bool time_if: 1;
+      bool joypad_if: 1;
+      uint8_t : 4;
+    };
+    uint8_t IF;
+  };
+
+  bool halt;
   bool IME;
 };
 
