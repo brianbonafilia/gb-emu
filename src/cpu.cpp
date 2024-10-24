@@ -7,6 +7,7 @@
 #include <cassert>
 #include "cpu.h"
 #include "alu.h"
+#include "ppu.h"
 #include "cartridge.h"
 
 namespace CPU {
@@ -22,6 +23,10 @@ uint16_t **reg_16ind = new uint16_t *[4];
 uint8_t *wram = new uint8_t[0x2000];
 uint8_t *hram = new uint8_t[0x7E];
 uint8_t *serial_port = new uint8_t[0x2];
+
+// amount of cycles in a frame, 114 per scanline, with 154 scanlines
+constexpr int kTotalCycles = 17556;
+int remaining_cycles = 0;
 
 bool found_break = false;
 uint16_t next_break = 0xC6A0;
@@ -41,8 +46,10 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return Cartridge::write(addr, val);
     case 0x8000 ... 0x9FFF:
-      // Video RAM
-      return 0;
+      if (m == write) {
+        return PPU::write_vram(addr, val);
+      }
+      return PPU::read_vram(addr);
     case 0XA000 ... 0xBFFF:
       // External RAM
       return 0;
@@ -111,7 +118,15 @@ uint8_t access(uint16_t addr, uint8_t val) {
         registers.IF = val;
       }
       return registers.IF;
-    case 0xFF10 ... 0xFF7F:
+    case 0xFF10 ... 0xFF45:
+      return 0x90;
+    case 0xFF46:
+      if (m == write) {
+        //PPU::beginDmaTransfer(val);
+        printf("my testing works yahoo");
+      }
+      return 0xFF;
+    case 0xFF47 ... 0xFF7F:
       return 0x90;
     case 0xFF80 ... 0xFFFE:
       // High RAM
@@ -161,6 +176,7 @@ uint8_t wr8(uint16_t addr, uint8_t val) {
 
 // TODO: evaluate running 4 M-cycles instead of one 4 cycle tick.
 void Tick() {
+  PPU::dot(); PPU::dot(); PPU::dot(); PPU::dot();
   registers.DIV++;
   if (registers.timer_enable) {
     switch (registers.clock_select) {
@@ -186,15 +202,11 @@ void Tick() {
     }
     // Overflow occurred, presumably
     if (registers.TIMA == 0x0) {
-//      printf("OK i think i should be interrupting my dude");
         registers.TIMA = registers.TMA;
         registers.time_if = true;
-//        printf("hmm doggie, IF: %X IE: %X TMA %X IME %X, clock select %X timer enable: %X", \
-//            registers.IF, registers.IE, registers.TMA, registers.IME, registers.clock_select, registers.timer_enable);
-
     }
   }
-
+  remaining_cycles--;
   tick_count++;
 }
 
@@ -746,6 +758,13 @@ void HandleInterrupt() {
   Tick();
 }
 
+void RunFrame(bool debug) {
+  remaining_cycles += kTotalCycles;
+  while (remaining_cycles > 0) {
+    ProcessInstruction(debug);
+  }
+}
+
 void ProcessInstruction(bool debug) {
   if ((registers.IE & registers.IF) > 0) {
     registers.halt = false;
@@ -773,7 +792,7 @@ void ProcessInstruction(bool debug) {
         access<read>(registers.PC + 2),
         access<read>(registers.PC + 3));
 //    if (registers.PC == next_break && registers.A == 0xDF && registers.L == 0x1C) {
-////      found_break = true;
+//      found_break = true;
 //      std::cin.ignore();
 //    }
   }

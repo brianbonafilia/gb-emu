@@ -14,11 +14,14 @@ SDL_Window *window;
 SDL_Renderer *renderer;
 SDL_Texture *game_pixels;
 
-const int kScreenWidth = 800;
-const int kSreenHeight = 720;
+constexpr int kScreenWidth = 800;
+constexpr int kSreenHeight = 720;
 
-const int kPixelWidth = 160;
-const int kPixelHeight = 144;
+constexpr int kPixelWidth = 160;
+constexpr int kPixelHeight = 144;
+
+// May make this more accurate i guess lately, probably does not matter. Currently 60FPS.
+constexpr uint32_t kFrameTimeInMs = 16;
 
 void UpdateTexture() {
   auto* pixels = new uint32_t[160*144];
@@ -65,12 +68,17 @@ void Init(bool debug) {
   SDL_RenderPresent(renderer);
   while (is_running) {
     SDL_Event e;
-    if (SDL_PollEvent(&e)) {
+    uint32_t startTime = SDL_GetTicks();
+    while (SDL_PollEvent(&e)) {
       if (e.type == SDL_QUIT) {
         is_running = false;
       }
     }
-    CPU::ProcessInstruction(debug);
+    CPU::RunFrame(debug);
+    uint32_t latency = SDL_GetTicks() - startTime;
+    if (latency < kFrameTimeInMs) {
+      SDL_Delay(kFrameTimeInMs - latency);
+    }
   }
 
   SDL_DestroyTexture(game_pixels);

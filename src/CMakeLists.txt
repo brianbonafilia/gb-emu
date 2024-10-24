@@ -10,6 +10,8 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         gui.h
         mappers/mbc1.cpp
         mappers/mbc1.h
+        ppu.cpp
+        ppu.h
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
@@ -39,10 +41,12 @@ enable_testing()
 
 add_executable(
         cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp
+        ppu.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
-        alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp)
+        alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
+        ppu.cpp)
 
 target_link_libraries(
         gb_emu

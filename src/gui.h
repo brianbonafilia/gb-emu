@@ -9,6 +9,8 @@ namespace GUI {
 
 void Init(bool debug);
 
+void UpdateTexture();
+
 }  // namespace
 
 #endif //GB_EMU_SRC_GUI_H_
