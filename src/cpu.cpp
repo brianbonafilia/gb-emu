@@ -85,6 +85,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
         registers.controller.joypad_input |= val;
       } else {
         if (!registers.controller.start_or_down) {
+          printf("good we are here");
         }
       }
       return registers.controller.joypad_input;
@@ -96,8 +97,8 @@ uint8_t access(uint16_t addr, uint8_t val) {
     case 0xFF02:
       if (m == write) {
         serial_port[1] = val;
-        if (val & 0x80) {
-//          std::cout << serial_port[0];
+        if (val == 0x81) {
+          std::cout << serial_port[0];
           serial_interrupt_counter = 8;
         }
       }
