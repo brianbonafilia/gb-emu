@@ -6,6 +6,7 @@
 #include <iostream>
 #include <cstdint>
 #include <random>
+#include <cassert>
 #include "cpu.h"
 
 namespace GUI {
@@ -20,16 +21,28 @@ constexpr int kSreenHeight = 720;
 constexpr int kPixelWidth = 160;
 constexpr int kPixelHeight = 144;
 
-// May make this more accurate i guess lately, probably does not matter. Currently 60FPS.
+CPU::Joypad actions{.joypad_input = 0xFF};
+CPU::Joypad direction{.joypad_input = 0xFF};
+
+// May make this more accurate i guess later, probably does not matter. Currently 60FPS.
 constexpr uint32_t kFrameTimeInMs = 16;
 
-void UpdateTexture() {
-  auto* pixels = new uint32_t[160*144];
-  for (int i = 0; i < 160 * 144; i++) {
-    pixels[i] = random() % 0xFFFFFFFF;
-  }
+void UpdateTexture(uint32_t* pixels) {
   SDL_UpdateTexture(game_pixels, nullptr, pixels,kPixelWidth * sizeof(uint32_t));
-  delete[] pixels;
+  SDL_RenderClear(renderer);
+  SDL_RenderCopy(renderer, game_pixels, nullptr, nullptr);
+  SDL_RenderPresent(renderer);
+}
+
+void SetControllerState(CPU::Joypad& controller) {
+  controller.buttons = 0xF;
+  if ((controller.joypad_input & 0xF0) == 0x30) {
+    controller.joypad_input = 0x3F;
+  } else if ((controller.joypad_input & 0xF0) == 0x20) {
+    controller.buttons = direction.buttons;
+  } else if ((controller.joypad_input & 0xF0) == 0x10) {
+    controller.buttons = actions.buttons;
+  }
 }
 
 void Init(bool debug) {
@@ -57,27 +70,54 @@ void Init(bool debug) {
 
   SDL_RenderSetLogicalSize(renderer, kPixelWidth, kPixelHeight);
   game_pixels =
-      SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, kPixelHeight, kPixelHeight);
+      SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB888, SDL_TEXTUREACCESS_STREAMING, kPixelWidth, kPixelHeight);
 
 
   bool is_running = true;
 
-  UpdateTexture();
-  SDL_RenderClear(renderer);
-  SDL_RenderCopy(renderer, game_pixels, nullptr, nullptr);
-  SDL_RenderPresent(renderer);
   while (is_running) {
     SDL_Event e;
     uint32_t startTime = SDL_GetTicks();
+    actions.buttons = 0xF;
+    direction.buttons = 0xF;
     while (SDL_PollEvent(&e)) {
       if (e.type == SDL_QUIT) {
         is_running = false;
+      } else if (e.type == SDL_KEYDOWN) {
+        switch (e.key.keysym.sym) {
+          case SDLK_UP:
+            direction.select_or_up = false;
+            break;
+          case SDLK_DOWN:
+            direction.start_or_down = false;
+            break;
+          case SDLK_LEFT:
+            direction.b_or_left = false;
+            break;
+          case SDLK_RIGHT:
+            direction.a_or_right = false;
+            break;
+          case SDLK_SPACE:
+            actions.a_or_right = false;
+            break;
+          case SDLK_x:
+            actions.b_or_left = false;
+            break;
+          case SDLK_RETURN:
+            actions.start_or_down = false;
+            break;
+          case SDLK_c:
+            actions.select_or_up = false;
+            break;
+        }
       }
     }
     CPU::RunFrame(debug);
     uint32_t latency = SDL_GetTicks() - startTime;
     if (latency < kFrameTimeInMs) {
       SDL_Delay(kFrameTimeInMs - latency);
+    } else {
+      printf("poopy pants\n");
     }
   }
 

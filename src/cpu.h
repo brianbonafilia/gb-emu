@@ -9,6 +9,25 @@
 
 namespace CPU {
 
+union Joypad {
+  struct {
+    bool a_or_right : 1;
+    bool b_or_left : 1;
+    bool select_or_up : 1;
+    bool start_or_down : 1;
+    bool select_dpad : 1;
+    bool select_buttons : 1;
+    uint8_t : 2;
+  };
+  struct {
+    uint8_t buttons : 4;
+    uint8_t : 4;
+  };
+  uint8_t joypad_input;
+
+  Joypad() = default;
+};
+
 /* CPU registers */
 struct Registers {
   // Accumulator and flags
@@ -77,25 +96,29 @@ struct Registers {
       bool v_blank_ie: 1;
       bool lcd_ie: 1;
       bool time_ie: 1;
+      bool serial_ie: 1;
       bool joypad_ie: 1;
-      uint8_t : 4;
+      uint8_t : 3;
     };
     uint8_t IE;
   };
-
+  // Interrupt Flags
   union {
     struct {
       bool v_blank_if: 1;
       bool lcd_if: 1;
       bool time_if: 1;
+      bool serial_if: 1;
       bool joypad_if: 1;
-      uint8_t : 4;
+      uint8_t : 3;
     };
     uint8_t IF;
   };
 
   bool halt;
   bool IME;
+
+  Joypad controller{ .joypad_input = 0xF};
 };
 
 enum mode {

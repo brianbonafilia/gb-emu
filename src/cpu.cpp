@@ -9,6 +9,7 @@
 #include "alu.h"
 #include "ppu.h"
 #include "cartridge.h"
+#include "gui.h"
 
 namespace CPU {
 namespace {
@@ -27,6 +28,7 @@ uint8_t *serial_port = new uint8_t[0x2];
 // amount of cycles in a frame, 114 per scanline, with 154 scanlines
 constexpr int kTotalCycles = 17556;
 int remaining_cycles = 0;
+int serial_interrupt_counter = 0;
 
 bool found_break = false;
 uint16_t next_break = 0xC6A0;
@@ -69,23 +71,34 @@ uint8_t access(uint16_t addr, uint8_t val) {
       // Not supposed to go here
       return 0;
     case 0xFE00 ... 0xFE9F:
-      // OAM Object attribute memory
-      return 0;
+      if (m == write) {
+        return PPU::write_oam(addr, val);
+      }
+      return PPU::read_oam(addr);
     case 0xFEA0 ... 0xFEFF:
       // Not usable
       return 0;
     case 0XFF00:
-      return 0;
+      if (m == write) {
+        val &= 0xF0;
+        registers.controller.joypad_input &= 0xF;
+        registers.controller.joypad_input |= val;
+      } else {
+        if (!registers.controller.start_or_down) {
+        }
+      }
+      return registers.controller.joypad_input;
     case 0xFF01:
       if (m == write) {
         serial_port[0] = val;
       }
-      return serial_port[0];
+      return 0xFF;
     case 0xFF02:
       if (m == write) {
         serial_port[1] = val;
-        if (val == 0x81) {
-          std::cout << serial_port[0];
+        if (val & 0x80) {
+//          std::cout << serial_port[0];
+          serial_interrupt_counter = 8;
         }
       }
     case 0xFF03:
@@ -118,16 +131,8 @@ uint8_t access(uint16_t addr, uint8_t val) {
         registers.IF = val;
       }
       return registers.IF;
-    case 0xFF10 ... 0xFF45:
-      return 0x90;
-    case 0xFF46:
-      if (m == write) {
-        //PPU::beginDmaTransfer(val);
-        printf("my testing works yahoo");
-      }
-      return 0xFF;
-    case 0xFF47 ... 0xFF7F:
-      return 0x90;
+    case 0xFF10 ... 0xFF7F:
+      return PPU::access_registers(m, addr, val);
     case 0xFF80 ... 0xFFFE:
       // High RAM
       if (m == write) {
@@ -136,6 +141,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
       return hram[addr - 0xFF80];
     case 0xFFFF:
       if (m == write) {
+        printf("We writing this val to IE %X\n", val);
         registers.IE = val;
       }
       return registers.IE;
@@ -204,6 +210,12 @@ void Tick() {
     if (registers.TIMA == 0x0) {
         registers.TIMA = registers.TMA;
         registers.time_if = true;
+    }
+  }
+  if (serial_interrupt_counter > 0) {
+    --serial_interrupt_counter;
+    if (serial_interrupt_counter == 0) {
+      registers.serial_if = true;
     }
   }
   remaining_cycles--;
@@ -384,7 +396,7 @@ void Execute_00_3F(uint8_t op_code) {
         }
         case 2:
           // TODO: STOP
-          std::cerr << "was supposed to stop but didnt" << std::endl;
+//          std::cerr << "was supposed to stop but didnt" << std::endl;
           return;
         case 3:
           JR(registers, (int8_t) rd8(registers.PC++));
@@ -765,7 +777,15 @@ void RunFrame(bool debug) {
   }
 }
 
+void SetControllerState() {
+  GUI::SetControllerState(registers.controller);
+  if (registers.controller.buttons ^ 0xF) {
+    registers.joypad_if = true;
+  }
+}
+
 void ProcessInstruction(bool debug) {
+  SetControllerState();
   if ((registers.IE & registers.IF) > 0) {
     registers.halt = false;
     if (registers.IME) {
@@ -1077,7 +1097,6 @@ void ProcessInstruction(bool debug) {
     default:
       std::cerr << "unimplemented op code: 0x" << std::hex << (int) op << std::endl;
       break;
-
   }
 }
 

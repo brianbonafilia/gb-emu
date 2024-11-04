@@ -41,15 +41,25 @@ enable_testing()
 
 add_executable(
         cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp
-        ppu.cpp
+        ppu.cpp gui.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
         alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
-        ppu.cpp)
+        ppu.cpp gui.cpp)
 
 target_link_libraries(
         gb_emu
+        SDL2::SDL2
+)
+
+target_link_libraries(
+        cpu_test
+        SDL2::SDL2
+)
+
+target_link_libraries(
+        alu_test
         SDL2::SDL2
 )
 

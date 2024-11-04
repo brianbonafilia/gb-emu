@@ -13,6 +13,13 @@ TEST(CpuTest, ProcessInstruction) {
   ProcessInstruction(false);
 }
 
+TEST(CpuTest, Joypad) {
+  Joypad joypad{};
+  joypad.select_or_up = true;
+  joypad.a_or_right = true;
+  EXPECT_EQ(joypad.joypad_input, 0x5);
+}
+
 TEST(CpuTest, RegistersCanAccessAs8Bit) {
   Registers r {};
   r.AF = 0x1234;
