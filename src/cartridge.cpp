@@ -54,9 +54,9 @@ void load_cartridge(const char *file_path) {
   }
 
 
-//  std::cout << "the cartridge type is " << std::hex << cartride_type << std::endl;
-//  std::cout << "rom size is " << std::hex << rom_size << std::endl;
-//  std::cout << "ram size is " << std::hex << ram_size << std::endl;
+  std::cout << "the cartridge type is " << std::hex << cartride_type << std::endl;
+  std::cout << "rom size is " << std::hex << rom_size << std::endl;
+  std::cout << "ram size is " << std::hex << ram_size << std::endl;
 
 }
 }  // namespace Cartridge

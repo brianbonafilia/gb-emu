@@ -25,6 +25,8 @@ uint8_t *wram = new uint8_t[0x2000];
 uint8_t *hram = new uint8_t[0x7E];
 uint8_t *serial_port = new uint8_t[0x2];
 
+bool next_op_ready = false;
+
 // amount of cycles in a frame, 114 per scanline, with 154 scanlines
 constexpr int kTotalCycles = 17556;
 int remaining_cycles = 0;
@@ -53,8 +55,10 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return PPU::read_vram(addr);
     case 0XA000 ... 0xBFFF:
-      // External RAM
-      return 0;
+      if (m == write) {
+        return Cartridge::write(addr, val);
+      }
+      return Cartridge::read(addr);
     case 0xC000 ... 0xCFFF:
       // Work RAM
       if (m == write) {
@@ -83,10 +87,6 @@ uint8_t access(uint16_t addr, uint8_t val) {
         val &= 0xF0;
         registers.controller.joypad_input &= 0xF;
         registers.controller.joypad_input |= val;
-      } else {
-        if (!registers.controller.start_or_down) {
-          printf("good we are here");
-        }
       }
       return registers.controller.joypad_input;
     case 0xFF01:
@@ -142,7 +142,6 @@ uint8_t access(uint16_t addr, uint8_t val) {
       return hram[addr - 0xFF80];
     case 0xFFFF:
       if (m == write) {
-        printf("We writing this val to IE %X\n", val);
         registers.IE = val;
       }
       return registers.IE;
@@ -152,14 +151,12 @@ uint8_t access(uint16_t addr, uint8_t val) {
 
 uint8_t imm8() {
   uint8_t val = rd8(registers.PC++);
-//  printf("read imm val 0x%X \n", val);
   return val;
 }
 
 uint16_t imm16() {
   uint16_t val = rd16(registers.PC);
   registers.PC += 2;
-//  printf("read imm val 0x%X \n", val);
   return val;
 }
 
@@ -171,7 +168,6 @@ uint16_t rd16(uint16_t addr) {
 
 uint8_t rd8(uint16_t addr) {
   Tick();
-//  printf("reading from %X \n", addr);
   return access<read>(addr);
 }
 
@@ -221,6 +217,7 @@ void Tick() {
   }
   remaining_cycles--;
   tick_count++;
+  next_op_ready = true;
 }
 
 void InitializeRegisters() {
@@ -756,16 +753,20 @@ void HandleInterrupt() {
   uint8_t interrupt = registers.IF & registers.IE;
   if (interrupt & 0x1) {
     intr_addr = 0x40;
+    registers.IF ^= 0x1;
   } else if (interrupt & 0x2) {
     intr_addr = 0x48;
+    registers.IF ^= 0x2;
   } else if (interrupt & 0x4) {
     intr_addr = 0x50;
+    registers.IF ^= 0x4;
   } else if (interrupt & 0x8) {
     intr_addr = 0x58;
-  } else if (interrupt & 0x1) {
+    registers.IF ^= 0x8;
+  } else if (interrupt & 0x10) {
     intr_addr = 0x60;
+    registers.IF ^= 0x10;
   }
-  registers.IF = 0;
   registers.IME = false;
   CALL(registers, intr_addr);
   Tick();
@@ -783,6 +784,10 @@ void SetControllerState() {
   if (registers.controller.buttons ^ 0xF) {
     registers.joypad_if = true;
   }
+}
+
+uint8_t getNextOp() {
+  return rd8(registers.PC++);
 }
 
 void ProcessInstruction(bool debug) {
@@ -821,7 +826,7 @@ void ProcessInstruction(bool debug) {
     Tick();
     return;
   }
-  uint8_t op = rd8(registers.PC++);
+  uint8_t op = getNextOp();
   switch (op) {
     case 0x00:
       break;

@@ -38,6 +38,10 @@ union Palette {
   uint8_t val;
 };
 
+enum PpuMode {
+  hblank, vblank, oam_scan, draw
+};
+
 struct Registers {
   /* LCD Control Registers */
   union {
@@ -49,12 +53,15 @@ struct Registers {
       // OBJ size
       bool obj_sz : 1;
       // BG tile map
+      // 0 = 0x9800-9bFF , 1 = 0x9C00-9FFF
       bool bg_tile_map : 1;
-      // BG Windows and tiles
+      // BG Windows and tiles data area
+      // 0 = 0x8800-97FF , 1 = 0x8000-8FFF
       bool bg_windows_tiles : 1;
       // Window enable
       bool window_enable : 1;
       // Window tile map
+      // 0 = 0x9800-9bFF , 1 = 0x9C00-9FFF
       bool window_tile_map : 1;
       // LCD and PPU enable
       bool ppu_enable : 1;
@@ -68,8 +75,18 @@ struct Registers {
   // LY compare
   uint8_t LYC;
   // LCD status
-  uint8_t STAT;
-
+  union {
+    struct {
+      // what mode is PPU in,  (
+      PpuMode mode : 2;
+      bool ly_eq : 1;
+      bool mode0_stat : 1;
+      bool mode1_stat : 1;
+      bool mode2_stat : 1;
+      bool lyc_stat : 1;
+    };
+    uint8_t STAT;
+  };
   /* Background Scrolling registers */
   uint8_t SCX;
   uint8_t SCY;

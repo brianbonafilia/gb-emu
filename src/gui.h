@@ -14,6 +14,8 @@ void Init(bool debug);
 
 void UpdateTexture(uint32_t* pixels);
 
+void DrawDebugScreen(uint32_t* pixels);
+
 void SetControllerState(CPU::Joypad& controller);
 
 }  // namespace

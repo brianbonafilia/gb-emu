@@ -27,19 +27,35 @@ constexpr uint32_t kGreyPalette[4]{kWhite, kLightGrey, kDarkGrey, kBlack};
 int current_dot = 0;
 Registers registers;
 
-void setVblankInterrupt() {
+void SetVblankInterrupt() {
   uint8_t IF = CPU::access<CPU::read>(0xFF0F);
   IF |= 1;
   CPU::access<CPU::write>(0xFF0F, IF);
 }
 
+void SetStatInterrupt() {
+  uint8_t IF = CPU::access<CPU::read>(0xFF0F);
+  IF |= 2;
+  CPU::access<CPU::write>(0xFF0F, IF);
+}
+
+bool RowOutOfBounds(int row) {
+  return row < 0 || row > 143;
+}
+
+bool ColOutOfBounds(int col) {
+  return col < 0 || col > 159;
+}
+
 void DrawTile( int tileAddr, int x, int y, uint32_t* pixels) {
   for (int row = 0; row < 8; ++row) {
+    if (RowOutOfBounds(row + y)) continue;
     uint8_t left_byte = vram[tileAddr + row * 2];
     uint8_t right_byte = vram[tileAddr + row * 2 + 1];
     uint8_t mask = 0x80;
     int shift = 7;
     for (int col = 0; col < 8; ++col) {
+      if (ColOutOfBounds(col + x)) continue;
       int pixel = ((y + row) * 160) + x + col;
       int val = 0; // ((left_byte & mask)| ((right_byte & mask) >> (shift-1));
       if (left_byte & mask) val += 1;
@@ -77,29 +93,37 @@ int GetTileAddr(int tile_idx) {
 }
 
 int GetSpriteAddr(int tile_idx) {
-  if (registers.obj_sz == 1) {
-    assert(false);
-  }
-  // TODO: maybe larger multiplier for larger sprites mode
   return tile_idx * 16;
 }
 
 void DrawSprite(int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t* pixels) {
   Palette palette;
   if (attributes.dmg_palette) {
-    palette.val = registers.OBP0;
-  } else {
     palette.val = registers.OBP1;
+  } else {
+    palette.val = registers.OBP0;
   }
-  for (int row_idx = 0; row_idx < 8; ++row_idx) {
+  int sprite_rows = 8;
+  int sprite_cols = 8;
+  if (registers.obj_sz) {
+    sprite_rows = 16;
+  }
+  for (int row_idx = 0; row_idx < sprite_rows; ++row_idx) {
     if (row + row_idx < 0) {
       continue;
     }
-    uint8_t left_byte = vram[tile_addr + row_idx * 2];
-    uint8_t right_byte = vram[tile_addr + row_idx * 2 + 1];
-    uint8_t mask = 0x80;
+    int sprite_row = row_idx;
+    if (attributes.flip_y) {
+      sprite_row = sprite_rows - row_idx;
+    }
+    uint16_t left_byte = vram[tile_addr + sprite_row * 2];
+    uint16_t right_byte = vram[tile_addr + sprite_row * 2 + 1];
+    uint16_t mask = 0x80;
+    if (attributes.flip_x) {
+      mask = 0x1;
+    }
     int shift = 7;
-    for (int col_idx = 0; col_idx < 8; ++col_idx) {
+    for (int col_idx = 0; col_idx < sprite_cols; ++col_idx) {
       if (col + col_idx < 0) {
         continue;
       }
@@ -123,20 +147,91 @@ void DrawSprite(int tile_addr, SpriteAttributes attributes, int row, int col, ui
           assert(false);
       }
       --shift;
+      if (attributes.flip_x) {
+        mask <<= 1;
+      } else {
+        mask >>= 1;
+      }
+    }
+  }
+}
+
+void DrawBackground(uint32_t* pixels) {
+  int tile_map_offset = registers.bg_tile_map ? 0x1C00 : 0x1800;
+  for (int row = 0; row < 18; ++row) {
+    for (int col = 0; col < 20; ++col) {
+      uint8_t tile_idx = vram[tile_map_offset + (row * 32) + col];
+      int vram_location = GetTileAddr(tile_idx);
+      DrawTile(vram_location, col * 8, row * 8, pixels);
+    }
+  }
+}
+
+void DrawWindow(uint32_t* pixels) {
+  if (!registers.window_enable) {
+    return;
+  }
+  int tile_map_offset = registers.window_tile_map ? 0x1C00 : 0x1800;
+  int colOffset = registers.WX - 7;
+  int rowOffset = registers.WY;
+  for (int row = 0; row < 18; ++row) {
+    for (int col = 0; col < 20; ++col) {
+      uint8_t tile_idx = vram[tile_map_offset + (row * 32) + col];
+      int vram_location = GetTileAddr(tile_idx);
+      DrawTile(vram_location, col * 8 + colOffset, row * 8 + rowOffset, pixels);
+    }
+  }
+}
+
+void DrawDebugTile( int tileAddr, int x, int y, uint32_t* pixels) {
+  for (int row = 0; row < 8; ++row) {
+    uint8_t left_byte = vram[tileAddr + row * 2];
+    uint8_t right_byte = vram[tileAddr + row * 2 + 1];
+    uint8_t mask = 0x80;
+    int shift = 7;
+    for (int col = 0; col < 8; ++col) {
+      int pixel = ((y + row) * 256) + x + col;
+      int val = 0;
+      if (left_byte & mask) val += 1;
+      if (right_byte & mask) val += 2;
+      switch (val) {
+        case 0:
+          pixels[pixel] = kGreyPalette[registers.bgp_id0];
+          break;
+        case 1:
+          pixels[pixel] = kGreyPalette[registers.bgp_id1];
+          break;
+        case 2:
+          pixels[pixel] = kGreyPalette[registers.bgp_id2];
+          break;
+        case 3:
+          pixels[pixel] = kGreyPalette[registers.bgp_id3];
+          break;
+        default:
+          assert(false);
+      }
+      --shift;
       mask >>= 1;
     }
   }
 }
 
-void DrawFrame() {
-  auto* pixels = new uint32_t[160 * 144];
-  for (int row = 0; row < 18; ++row) {
-    for (int col = 0; col < 20; ++col) {
+void DrawDebugScreen() {
+  auto* pixels = new uint32_t[256 * 512];
+  for(int row = 0; row < 64; ++row) {
+    for (int col = 0; col < 32; ++col) {
       uint8_t tile_idx = vram[0x1800 + (row * 32) + col];
       int vram_location = GetTileAddr(tile_idx);
-      DrawTile(vram_location, col * 8, row * 8, pixels);
+      DrawDebugTile(vram_location, col * 8, row * 8, pixels);
     }
   }
+  GUI::DrawDebugScreen(pixels);
+}
+
+void DrawFrame() {
+  auto* pixels = new uint32_t[160 * 144];
+  DrawBackground(pixels);
+  DrawWindow(pixels);
   for (int i = 0; i < 0xA0; i+=4) {
     int row = oam[i];
     int col = oam[i + 1];
@@ -145,7 +240,7 @@ void DrawFrame() {
     if (row < 8 || row >= 160 ) {
       continue;
     }
-    if (col < 8 || col > 168) {
+    if (col < -8 || col > 168) {
       continue;
     }
     uint8_t tile_idx = oam[i + 2];
@@ -158,20 +253,50 @@ void DrawFrame() {
   delete []pixels;
 }
 
+void HandleStat() {
+  if (current_dot == 0) {
+    if (registers.mode1_stat) {
+      SetStatInterrupt();
+    }
+    if (registers.LY < 143) {
+      registers.mode = PpuMode::oam_scan;
+    }
+  } else if (current_dot == 80) {
+    if (registers.LY < 143) {
+      registers.mode = PpuMode::draw;
+    }
+  } else if (current_dot == 172) {
+    SetStatInterrupt();
+    if (registers.LY < 143) {
+      registers.mode = PpuMode::hblank;
+    }
+  }
+}
+
 void StepForwardDot() {
   ++current_dot;
+
   if (current_dot == 456) {
     current_dot = 0;
     ++registers.LY;
     if (registers.LY == 60) {
       DrawFrame();
+      DrawDebugScreen();
     }
     if (registers.LY == 144) {
-      setVblankInterrupt();
+      registers.mode = PpuMode::vblank;
+      SetVblankInterrupt();
+      if (registers.mode1_stat) {
+        SetStatInterrupt();
+      }
     } else if (registers.LY == 154) {
       registers.LY = 0;
     }
+    if (registers.lyc_stat && registers.LY == registers.LYC) {
+      SetStatInterrupt();
+    }
   }
+  HandleStat();
 }
 
 void DmaTransfer(uint8_t idx) {
@@ -242,17 +367,25 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
     case 0xFF48:
       if (m == CPU::write) {
         registers.OBP0 = val;
-        printf("writing val to OBPO %X\n", val);
       }
       return registers.OBP0;
     case 0xFF49:
       if (m == CPU::write) {
         registers.OBP1 = val;
-        printf("writing val to OBP1 %X\n", val);
       }
       return registers.OBP1;
-    case 0xFF70 ... 0xFF7F:
-      return 0x90;
+    case 0xFF4A:
+      if (m == CPU::write) {
+        printf("some trickery up in dis %X \n", val);
+        registers.WY = val;
+      }
+      return registers.WY;
+    case 0xFF4B:
+      if (m == CPU::write) {
+        printf("some trickery up in dis %X \n", val);
+        registers.WX = val;
+      }
+      return registers.WX;
     default:
       return 0x90;
   }
