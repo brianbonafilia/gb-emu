@@ -1,7 +1,8 @@
 set(CMAKE_CXX_STANDARD 17)
 add_library(cpu cpu.cpp cpu.h
         cartridge.cpp
-        cartridge.h alu.cpp alu.h mapper.cpp)
+        cartridge.h alu.cpp alu.h mapper.cpp
+        rendering/draw.cpp)
 
 set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mapper.cpp
@@ -12,6 +13,8 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mappers/mbc1.h
         ppu.cpp
         ppu.h
+        rendering/draw.h
+        rendering/draw.cpp
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
@@ -42,11 +45,13 @@ enable_testing()
 add_executable(
         cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp
         ppu.cpp gui.cpp
+        rendering/draw.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
         alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
-        ppu.cpp gui.cpp)
+        ppu.cpp gui.cpp
+        rendering/draw.cpp)
 
 target_link_libraries(
         gb_emu

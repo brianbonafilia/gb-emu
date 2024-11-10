@@ -8,6 +8,7 @@
 #include <random>
 #include <cassert>
 #include "cpu.h"
+#include "ppu.h"
 
 namespace GUI {
 
@@ -102,6 +103,7 @@ void Init(bool debug) {
                                      SDL_TEXTUREACCESS_STREAMING,
                                      kDPixelWidth,
                                      kDPixelHeight);
+    PPU::set_debug(debug);
   }
 
   bool is_running = true;

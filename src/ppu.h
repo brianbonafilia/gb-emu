@@ -10,6 +10,15 @@
 
 namespace PPU {
 
+constexpr uint32_t kWhite = 0x00FFFFFF;
+constexpr uint32_t kLightGrey = 0x00a9a9a9;
+constexpr uint32_t kDarkGrey = 0x00545454;
+constexpr uint32_t kBlack = 0;
+
+constexpr uint16_t kOamOffset = 0xFE00;
+
+constexpr uint32_t kGreyPalette[4]{kWhite, kLightGrey, kDarkGrey, kBlack};
+
 union SpriteAttributes {
   struct {
     // CGB select palette
@@ -128,6 +137,12 @@ struct Registers {
   };
 };
 
+struct PpuState {
+  Registers& registers;
+  uint8_t* vram;
+  uint8_t* oam;
+};
+
 uint8_t read_vram(uint16_t addr);
 
 uint8_t write_vram(uint16_t addr, uint8_t val);
@@ -141,6 +156,8 @@ void beginDmaTransfer(uint8_t addr);
 void dot();
 
 uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val = 0);
+
+void set_debug(bool setting);
 
 }  // namespace PPU
 
