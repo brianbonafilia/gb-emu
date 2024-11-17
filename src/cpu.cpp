@@ -177,6 +177,14 @@ uint8_t wr8(uint16_t addr, uint8_t val) {
   return access<write>(addr, val);
 }
 
+// Check if the last increment caused a timer to overflow
+void CheckTimer() {
+  if (registers.TIMA == 0x0) {
+    registers.TIMA = registers.TMA;
+    registers.time_if = true;
+  }
+}
+
 // TODO: evaluate running 4 M-cycles instead of one 4 cycle tick.
 void Tick() {
   PPU::dot(); PPU::dot(); PPU::dot(); PPU::dot();
@@ -186,27 +194,27 @@ void Tick() {
       case 0x0:
         if (registers.DIV % 256 == 0) {
           registers.TIMA++;
+          CheckTimer();
         }
         break;
       case 0x1:
-        if (registers.DIV % 4 == 0)
-        registers.TIMA++;
+        if (registers.DIV % 4 == 0) {
+          registers.TIMA++;
+          CheckTimer();
+        }
         break;
       case 0x2:
         if (registers.DIV % 16 == 0) {
           registers.TIMA++;
+          CheckTimer();
         }
         break;
       case 0x3:
         if (registers.DIV % 64 == 0) {
           registers.TIMA++;
+          CheckTimer();
         }
         break;
-    }
-    // Overflow occurred, presumably
-    if (registers.TIMA == 0x0) {
-        registers.TIMA = registers.TMA;
-        registers.time_if = true;
     }
   }
   if (serial_interrupt_counter > 0) {

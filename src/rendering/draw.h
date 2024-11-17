@@ -22,6 +22,10 @@ void DrawWindow(const PpuState& state, uint32_t* pixels);
 
 void DrawDebugScreen(const PpuState& state);
 
+void DrawOam(const PpuState& state);
+
+void DrawDot(const PpuState& state);
+
 }
 
 #endif //GB_EMU_SRC_RENDERING_DRAW_H_

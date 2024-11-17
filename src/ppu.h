@@ -104,6 +104,21 @@ struct Registers {
   uint8_t WX;
   uint8_t WY;
 
+  /* Internal PPU registers */
+  bool is_in_window;
+  int current_dot;
+  int x_pos;
+  int bg_step;
+
+  /* FIFO data */
+  Palette background_pallete;
+  Palette obj_pallete;
+  uint8_t bg_low;
+  uint8_t bg_high;
+  uint8_t obj_low;
+  uint8_t obj_high;
+
+
   /* Palette Registers */
   // Background palette
   union {
@@ -135,12 +150,17 @@ struct Registers {
     };
     uint8_t OBP1;
   };
+
+  Registers() = default;
 };
+
+
 
 struct PpuState {
   Registers& registers;
   uint8_t* vram;
   uint8_t* oam;
+  uint32_t* pixels;
 };
 
 uint8_t read_vram(uint16_t addr);

@@ -3,6 +3,7 @@
 //
 
 #include <cstdint>
+#include <cstdio>
 #include "ppu.h"
 #include "cpu.h"
 #include "gui.h"
@@ -12,6 +13,7 @@ namespace PPU {
 namespace {
 uint8_t *vram = new uint8_t[0x2000];
 uint8_t *oam = new uint8_t[0xA0];
+uint32_t *pixels = new uint32_t[144 * 156];
 
 int current_dot = 0;
 Registers registers;
@@ -21,6 +23,7 @@ PpuState state {
     .registers = registers,
     .vram = vram,
     .oam = oam,
+    .pixels = pixels,
 };
 
 
@@ -90,7 +93,7 @@ void StepForwardDot() {
     ++registers.LY;
     if (registers.LY == 60) {
       DrawFrame();
-      DrawDebugScreen(state);
+      if (debug) DrawDebugScreen(state);
     }
     if (registers.LY == 144) {
       registers.mode = PpuMode::vblank;
@@ -130,9 +133,69 @@ uint8_t write_vram(uint16_t addr, uint8_t val) {
   return vram[addr - 0x8000];
 }
 
+// Update the location of the current dot and line.
+void IncrementPosition() {
+  ++current_dot;
+  if (current_dot == 456) {
+    current_dot = 0;
+    registers.x_pos = 0;
+    registers.is_in_window = false;
+    ++registers.LY;
+    if (registers.LY == registers.LYC && registers.lyc_stat) {
+      SetStatInterrupt();
+    }
+    if (registers.LY == 154) {
+      DrawOam(state);
+      GUI::UpdateTexture(pixels);
+      registers.LY = 0;
+    }
+  }
+}
+
+PpuMode GetMode() {
+  if (registers.LY > 143) {
+    return PpuMode::vblank;
+  }
+  if (current_dot < 80) {
+    return PpuMode::oam_scan;
+  }
+  // TODO: at some point, for games which require accurate timeing we will
+  // need to consider adding OBJ penalties. And making this mode variable.
+  if (current_dot > 80  && current_dot < 252) {
+    return PpuMode::draw;
+  }
+  return PpuMode::hblank;
+}
+
+void Step() {
+  IncrementPosition();
+  PpuMode new_mode = GetMode();
+  if (new_mode != registers.mode) {
+    registers.mode = new_mode;
+    if (new_mode == vblank) {
+      SetVblankInterrupt();
+    }
+    //TODO: stat interupts
+  }
+  switch (registers.mode) {
+    case oam_scan:
+      // TODO: consider having a OAM buffer and drawing OBJs realistically
+      break;
+    case draw:
+      DrawDot(state);
+      break;
+    case hblank:
+    case vblank:
+      // no-op
+      break;
+  }
+}
+
+
 // execute one dot
 void dot() {
-  StepForwardDot();
+//  StepForwardDot();
+  Step();
 }
 
 uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
@@ -156,6 +219,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       return registers.SCY;
     case 0xFF43:
       if (m == CPU::write) {
+        printf("writing val %X to SCX\n", val);
         registers.SCX = val;
       }
       return registers.SCX;
