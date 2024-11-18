@@ -47,8 +47,10 @@ void load_cartridge(const char *file_path) {
       mapper = new Mapper(data);
       break;
     case 1:
-      mapper = new MBC1(data);
+      mapper = new MBC1(data, rom_size, ram_size);
       break;
+    case 3:
+      mapper = new MBC1(data, rom_size, ram_size);
     default:
       std::cerr << "mapper type not supported: Mapper " << cartride_type << std::endl;
   }

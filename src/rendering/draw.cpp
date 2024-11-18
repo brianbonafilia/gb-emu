@@ -305,6 +305,7 @@ void DrawDot(const PpuState& state) {
   int bg_step = state.registers.bg_step;
   int x_pos = state.registers.x_pos;
   if (x_pos >= 160) {
+    state.registers.bg_step = 0;
     return;
   }
   if (!state.registers.is_in_window && IsInWindow(state)) {

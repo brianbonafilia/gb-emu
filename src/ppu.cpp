@@ -117,6 +117,29 @@ void DmaTransfer(uint8_t idx) {
   }
 }
 
+// Update the location of the current dot and line.
+void IncrementPosition() {
+  ++current_dot;
+  if (current_dot == 456) {
+    current_dot = 0;
+    registers.x_pos = 0;
+    registers.is_in_window = false;
+    ++registers.LY;
+    if (registers.LY == 154) {
+      DrawOam(state);
+      GUI::UpdateTexture(pixels);
+      registers.LY = 0;
+      registers.ly_eq = false;
+    }
+    if (registers.LY == registers.LYC) {
+      if (registers.lyc_stat) {
+        SetStatInterrupt();
+      }
+      registers.ly_eq = true;
+    }
+  }
+}
+
 }  // namespace
 
 void set_debug(bool setting) {
@@ -131,25 +154,6 @@ uint8_t read_vram(uint16_t addr) {
 uint8_t write_vram(uint16_t addr, uint8_t val) {
   vram[addr - 0x8000] = val;
   return vram[addr - 0x8000];
-}
-
-// Update the location of the current dot and line.
-void IncrementPosition() {
-  ++current_dot;
-  if (current_dot == 456) {
-    current_dot = 0;
-    registers.x_pos = 0;
-    registers.is_in_window = false;
-    ++registers.LY;
-    if (registers.LY == registers.LYC && registers.lyc_stat) {
-      SetStatInterrupt();
-    }
-    if (registers.LY == 154) {
-      DrawOam(state);
-      GUI::UpdateTexture(pixels);
-      registers.LY = 0;
-    }
-  }
 }
 
 PpuMode GetMode() {
@@ -167,15 +171,25 @@ PpuMode GetMode() {
   return PpuMode::hblank;
 }
 
+void SetInterruptIfNeeded(PpuMode mode) {
+  if (registers.mode0_stat && mode == hblank) {
+    SetStatInterrupt();
+  } else if (registers.mode1_stat && mode == vblank) {
+    SetStatInterrupt();
+  } else if (registers.mode2_stat && mode == oam_scan) {
+    SetStatInterrupt();
+  }
+}
+
 void Step() {
   IncrementPosition();
   PpuMode new_mode = GetMode();
   if (new_mode != registers.mode) {
+    SetInterruptIfNeeded(new_mode);
     registers.mode = new_mode;
     if (new_mode == vblank) {
       SetVblankInterrupt();
     }
-    //TODO: stat interupts
   }
   switch (registers.mode) {
     case oam_scan:
@@ -219,14 +233,13 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       return registers.SCY;
     case 0xFF43:
       if (m == CPU::write) {
-        printf("writing val %X to SCX\n", val);
         registers.SCX = val;
       }
       return registers.SCX;
     case 0xFF44:
       return registers.LY;
     case 0xFF45:
-      if (m == registers.LYC) {
+      if (m == CPU::write) {
         registers.LYC = val;
       }
       return registers.LYC;
