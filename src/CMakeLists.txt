@@ -2,7 +2,8 @@ set(CMAKE_CXX_STANDARD 17)
 add_library(cpu cpu.cpp cpu.h
         cartridge.cpp
         cartridge.h alu.cpp alu.h mapper.cpp
-        rendering/draw.cpp)
+        rendering/draw.cpp
+        debug/log.cpp)
 
 set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mapper.cpp
@@ -15,10 +16,13 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         ppu.h
         rendering/draw.h
         rendering/draw.cpp
+        debug/log.h
+        debug/log.cpp
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
-add_executable(gb_emu ${SOURCE_FILES})
+add_executable(gb_emu ${SOURCE_FILES}
+        debug/log.cpp)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -46,12 +50,14 @@ add_executable(
         cpu_test cpu_test.cpp cpu alu.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp
         ppu.cpp gui.cpp
         rendering/draw.cpp
+        debug/log.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
         alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
         ppu.cpp gui.cpp
-        rendering/draw.cpp)
+        rendering/draw.cpp
+        debug/log.cpp)
 
 target_link_libraries(
         gb_emu

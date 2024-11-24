@@ -14,8 +14,10 @@ class MBC1 : public Mapper {
   uint8_t write(uint16_t addr, uint8_t val) override;
 
  private:
+  bool advanced_banking = false;
   bool ram_enabled_ = false;
   int rom_bank_index_ = 1;
+  int rom_low_bank_index = 0;
   int rom_size_;
   int ram_size_;
   uint8_t rom_mask_;

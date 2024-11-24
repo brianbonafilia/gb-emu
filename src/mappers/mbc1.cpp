@@ -5,32 +5,57 @@
 
 #include "mbc1.h"
 #include <iostream>
+#include <cassert>
 
 uint8_t MBC1::read(uint16_t addr) {
   int bank_offset = 0x4000 * (rom_bank_index_ - 1);
   switch (addr) {
     case 0x0000 ... 0x3FFF:
+      if (advanced_banking) {
+        printf("oh nozey");
+        int low_offset = 0x4000 * (rom_low_bank_index);
+        return rom_[addr + low_offset];
+      }
       return rom_[addr];
     case 0x4000 ... 0x7FFF:
       return rom_[addr + bank_offset];
     case 0xA000 ... 0xBFFF:
+      if (advanced_banking) {
+        int low_offset = 0x4000 * (rom_low_bank_index & 0x3);
+        return ram_[addr + low_offset];
+      }
       return ram_[addr - 0xA000];
+    default:
+      assert(false);
   }
   return rom_[addr];
 }
 uint8_t MBC1::write(uint16_t addr, uint8_t val) {
   switch(addr){
     case 0x0000 ... 0x1FFF:
+//      printf("been writing here \n");
       if ((val & 0xF) == 0xA) {
         ram_enabled_ = true;
       }
       break;
     case 0x2000 ... 0x3FFF:
       rom_bank_index_ = val & rom_mask_;
-      if (rom_bank_index_ == 0) rom_bank_index_ = 1;
+      if ((val & 0x1F) == 0) rom_bank_index_ = 1;
+//      printf("rom bank is now %X, val is %X\n", rom_bank_index_, val);
+      break;
+    case 0x4000 ... 0x5FFF:
+      printf("this would shed light?, val %X\n", val);
+      rom_low_bank_index = val & rom_mask_;
+    case 0x6000 ... 0x7FFF:
+      printf("this would be helpful %X\n", val);
+      advanced_banking = val & 1;
       break;
     case 0xA000 ... 0xBFFF:
+//      printf("ok i'm writing to ram? %X : %X\n", val, addr);
       ram_[addr - 0xA000] = val;
+      break;
+    default:
+      printf("other write detected, %X %X\n", addr, val);
   }
   return val;
 }

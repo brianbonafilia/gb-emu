@@ -28,12 +28,14 @@ PpuState state {
 
 
 void SetVblankInterrupt() {
+  if (!registers.ppu_enable) return;
   uint8_t IF = CPU::access<CPU::read>(0xFF0F);
   IF |= 1;
   CPU::access<CPU::write>(0xFF0F, IF);
 }
 
 void SetStatInterrupt() {
+  if (!registers.ppu_enable) return;
   uint8_t IF = CPU::access<CPU::read>(0xFF0F);
   IF |= 2;
   CPU::access<CPU::write>(0xFF0F, IF);
@@ -61,7 +63,7 @@ void DrawFrame() {
     DrawSprite(state, sprite_addr, attributes, row, col, pixels);
 
   }
-  GUI::UpdateTexture(pixels);
+  if (registers.ppu_enable) GUI::UpdateTexture(pixels);
   delete []pixels;
 }
 
@@ -125,8 +127,10 @@ void IncrementPosition() {
     registers.x_pos = 0;
     registers.is_in_window = false;
     ++registers.LY;
-    if (registers.LY == 154) {
+    if (registers.LY == 144) {
       DrawOam(state);
+    }
+    if (registers.LY == 154) {
       GUI::UpdateTexture(pixels);
       registers.LY = 0;
       registers.ly_eq = false;
@@ -219,11 +223,15 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
     case 0xFF40:
       if (m == CPU::write) {
         registers.LCDC = val;
+        if (!registers.ppu_enable) {
+          printf("turning off PPU\n");
+        }
       }
       return registers.LCDC;
     case 0xFF41:
       if (m == CPU::write) {
-        registers.STAT = val;
+        val &= ~(0x3);
+        registers.STAT |= val;
       }
       return registers.STAT;
     case 0xFF42:
@@ -284,6 +292,7 @@ uint8_t write_oam(uint16_t addr, uint8_t val) {
 }
 
 uint8_t read_oam(uint16_t addr) {
+  printf("is this possibly related\n");
   return oam[addr - kOamOffset];
 }
 

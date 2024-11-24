@@ -10,6 +10,7 @@
 #include "ppu.h"
 #include "cartridge.h"
 #include "gui.h"
+#include "debug/log.h"
 
 namespace CPU {
 namespace {
@@ -72,6 +73,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return wram[addr - 0xC000];
     case 0xE000 ... 0xFDFF:
+      printf("testing?\n");
       // Not supposed to go here
       return 0;
     case 0xFE00 ... 0xFE9F:
@@ -146,6 +148,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return registers.IE;
   }
+  printf("hmmm???\n");
   return 0;
 }
 
@@ -344,6 +347,7 @@ void handleOctalOpPattern(T op, int bit, int octal_col) {
       op(registers, registers.A, bit);
       return;
     default:
+      assert("false");
       break;
   }
 }
@@ -746,13 +750,16 @@ void Execute_C0_FF(uint8_t op_code) {
       }
       break;
     case 7:
+//      printf("this could be sus? %X %X\n ", registers.PC, op_code);
       RST(registers, 0x8 * octal_row);
       return;
     default:
       std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
+      assert(false);
       break;
   }
   std::cerr << "unimplemented op code: 0x" << std::hex << (int) op_code << std::endl;
+  assert(false);
 }
 
 void HandleInterrupt() {
@@ -775,6 +782,7 @@ void HandleInterrupt() {
     intr_addr = 0x60;
     registers.IF ^= 0x10;
   }
+//  printf("interrupt occurred \n");
   registers.IME = false;
   CALL(registers, intr_addr);
   Tick();
@@ -808,9 +816,12 @@ void ProcessInstruction(bool debug) {
       return;
     }
   }
+  if (registers.PC == 0x41CF) {
+    printf("up in dis");
+  }
   if (debug) {
     printf(
-        "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X)\n",
+        "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X) %s\n",
         registers.A,
         registers.F,
         registers.B,
@@ -824,7 +835,8 @@ void ProcessInstruction(bool debug) {
         access<read>(registers.PC),
         access<read>(registers.PC + 1),
         access<read>(registers.PC + 2),
-        access<read>(registers.PC + 3));
+        access<read>(registers.PC + 3),
+        GetOpString(registers).c_str());
 //    if (registers.PC == next_break && registers.A == 0xDF && registers.L == 0x1C) {
 //      found_break = true;
 //      std::cin.ignore();
@@ -1110,6 +1122,7 @@ void ProcessInstruction(bool debug) {
       break;
     default:
       std::cerr << "unimplemented op code: 0x" << std::hex << (int) op << std::endl;
+      assert(false);
       break;
   }
 }

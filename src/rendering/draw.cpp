@@ -150,7 +150,7 @@ int GetSpriteAddr(int tile_idx) {
 }
 
 void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t *pixels) {
-  Palette palette;
+  Palette palette {};
   if (attributes.dmg_palette) {
     palette.val = state.registers.OBP1;
   } else {
@@ -178,6 +178,8 @@ void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attribute
     int shift = 7;
     for (int col_idx = 0; col_idx < sprite_cols; ++col_idx) {
       if (col + col_idx < 0) {
+        continue;
+      } else if (col + col_idx >= 160) {
         continue;
       }
       int pixel = ((row + row_idx) * 160) + col + col_idx;
@@ -209,13 +211,20 @@ void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attribute
   }
 }
 
+int MinRowVal(const Registers& registers) {
+  if (registers.obj_sz) {
+    return 0;
+  }
+  return 8;
+}
+
 void DrawOam(const PpuState& state) {
   for (int i = 0; i < 0xA0; i+=4) {
     int row = state.oam[i];
     int col = state.oam[i + 1];
     row -= 16;
     col -= 8;
-    if (row < 8 || row >= 160 ) {
+    if (row < MinRowVal(state.registers) || row >= 160 ) {
       continue;
     }
     if (col < -8 || col > 168) {

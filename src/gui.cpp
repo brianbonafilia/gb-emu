@@ -140,6 +140,8 @@ void Init(bool debug) {
           case SDLK_c:
             actions.select_or_up = false;
             break;
+          case SDLK_p:
+            debug = ~debug;
         }
       } else if (e.type == SDL_KEYUP) {
           switch (e.key.keysym.sym) {
