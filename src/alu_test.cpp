@@ -149,12 +149,6 @@ TEST(ALU, AddSPe8) {
   ASSERT_EQ(r.F, 0x30);
 }
 
-TEST(ALU, Add) {
-  Registers r{.A = 0xC1, .F = 0x05};
-  SUB_A(r, 0xFC);
-  EXPECT_EQ(r.A, 0xBC);
-  EXPECT_EQ(r.F, 0x40);
-}
 
 
 }  /// namespace

@@ -837,6 +837,14 @@ void ProcessInstruction(bool debug) {
         access<read>(registers.PC + 2),
         access<read>(registers.PC + 3),
         GetOpString(registers).c_str());
+//    printf(
+//        "current stack (%02X %02X %02X %02X %02X %02X)\n",
+//        access<read>(registers.SP),
+//        access<read>(registers.SP + 1),
+//        access<read>(registers.SP + 2),
+//        access<read>(registers.SP + 3),
+//        access<read>(registers.SP + 4),
+//        access<read>(registers.SP + 5));
 //    if (registers.PC == next_break && registers.A == 0xDF && registers.L == 0x1C) {
 //      found_break = true;
 //      std::cin.ignore();

@@ -8,6 +8,7 @@
 #include "mapper.h"
 #include "cpu.h"
 #include "mappers/mbc1.h"
+#include "mappers/mbc3.h"
 
 namespace Cartridge {
 
@@ -47,10 +48,13 @@ void load_cartridge(const char *file_path) {
       mapper = new Mapper(data);
       break;
     case 1:
-      mapper = new MBC1(data, rom_size, ram_size);
-      break;
+    case 2:
     case 3:
       mapper = new MBC1(data, rom_size, ram_size);
+      break;
+    case 0x13:
+      mapper = new MBC3(data, rom_size, ram_size);
+      break;
     default:
       std::cerr << "mapper type not supported: Mapper " << cartride_type << std::endl;
   }

@@ -41,78 +41,6 @@ void SetStatInterrupt() {
   CPU::access<CPU::write>(0xFF0F, IF);
 }
 
-
-void DrawFrame() {
-  auto* pixels = new uint32_t[160 * 144];
-  DrawBackground(state, pixels);
-  DrawWindow(state, pixels);
-  for (int i = 0; i < 0xA0; i+=4) {
-    int row = oam[i];
-    int col = oam[i + 1];
-    row -= 16;
-    col -= 8;
-    if (row < 8 || row >= 160 ) {
-      continue;
-    }
-    if (col < -8 || col > 168) {
-      continue;
-    }
-    uint8_t tile_idx = oam[i + 2];
-    SpriteAttributes attributes{.attr = oam[i + 3]};
-    int sprite_addr = GetSpriteAddr(tile_idx);
-    DrawSprite(state, sprite_addr, attributes, row, col, pixels);
-
-  }
-  if (registers.ppu_enable) GUI::UpdateTexture(pixels);
-  delete []pixels;
-}
-
-void HandleStat() {
-  if (current_dot == 0) {
-    if (registers.mode1_stat) {
-      SetStatInterrupt();
-    }
-    if (registers.LY < 143) {
-      registers.mode = PpuMode::oam_scan;
-    }
-  } else if (current_dot == 80) {
-    if (registers.LY < 143) {
-      registers.mode = PpuMode::draw;
-    }
-  } else if (current_dot == 172) {
-    SetStatInterrupt();
-    if (registers.LY < 143) {
-      registers.mode = PpuMode::hblank;
-    }
-  }
-}
-
-void StepForwardDot() {
-  ++current_dot;
-
-  if (current_dot == 456) {
-    current_dot = 0;
-    ++registers.LY;
-    if (registers.LY == 60) {
-      DrawFrame();
-      if (debug) DrawDebugScreen(state);
-    }
-    if (registers.LY == 144) {
-      registers.mode = PpuMode::vblank;
-      SetVblankInterrupt();
-      if (registers.mode1_stat) {
-        SetStatInterrupt();
-      }
-    } else if (registers.LY == 154) {
-      registers.LY = 0;
-    }
-    if (registers.lyc_stat && registers.LY == registers.LYC) {
-      SetStatInterrupt();
-    }
-  }
-  HandleStat();
-}
-
 void DmaTransfer(uint8_t idx) {
   for (int i = 0; i < 0xA0; ++i) {
     oam[i] = CPU::access<CPU::read>((idx << 8) | i);
@@ -131,7 +59,7 @@ void IncrementPosition() {
       DrawOam(state);
     }
     if (registers.LY == 154) {
-      GUI::UpdateTexture(pixels);
+      if (registers.ppu_enable) GUI::UpdateTexture(pixels);
       registers.LY = 0;
       registers.ly_eq = false;
     }
@@ -140,6 +68,8 @@ void IncrementPosition() {
         SetStatInterrupt();
       }
       registers.ly_eq = true;
+    } else {
+      registers.ly_eq = false;
     }
   }
 }
@@ -212,7 +142,6 @@ void Step() {
 
 // execute one dot
 void dot() {
-//  StepForwardDot();
   Step();
 }
 
@@ -224,13 +153,18 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       if (m == CPU::write) {
         registers.LCDC = val;
         if (!registers.ppu_enable) {
-          printf("turning off PPU\n");
+          printf("turning off ppu %X\n", registers.LCDC);
+          current_dot = 0;
+          registers.LY = 0;
+        } else if (registers.ppu_enable) {
+          printf("turning on ppu %X\n", registers.LCDC);
         }
       }
       return registers.LCDC;
     case 0xFF41:
       if (m == CPU::write) {
-        val &= ~(0x3);
+        printf("writing to STAT %X\n", val);
+        val &= ~(0x7);
         registers.STAT |= val;
       }
       return registers.STAT;

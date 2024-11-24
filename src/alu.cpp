@@ -223,11 +223,7 @@ void LD_HL(Registers& registers, int8_t e8) {
 void ADD_SP(Registers& registers, int8_t e8) {
   registers.cf = (registers.SP & 0xFF) + ((uint8_t) e8 & 0xFF) > 0xFF;
   registers.hf = (registers.SP & 0xF) + ((uint8_t) e8 & 0xF) > 0xF;
-  if (e8 < 0) {
-    registers.SP -= (uint8_t)(~(e8) + 1);
-  } else {
-    registers.SP += (uint8_t) e8;
-  }
+  registers.SP += e8;
   Tick(); Tick();
   registers.zf = 0;
   registers.nf = 0;
@@ -235,12 +231,7 @@ void ADD_SP(Registers& registers, int8_t e8) {
 
 void JR(Registers& registers, int8_t e8) {
   Tick();
-  if (e8 < 0) {
-    registers.PC -= (uint8_t)(~e8 + 1);
-  }
-  else {
-    registers.PC += e8;
-  }
+  registers.PC += e8;
 }
 
 void JR(Registers& registers, int8_t e8, bool cc) {

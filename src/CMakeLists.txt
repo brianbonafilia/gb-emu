@@ -3,7 +3,9 @@ add_library(cpu cpu.cpp cpu.h
         cartridge.cpp
         cartridge.h alu.cpp alu.h mapper.cpp
         rendering/draw.cpp
-        debug/log.cpp)
+        debug/log.cpp
+        mappers/mbc3.h
+        mappers/mbc3.cpp)
 
 set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         mapper.cpp
@@ -18,11 +20,15 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         rendering/draw.cpp
         debug/log.h
         debug/log.cpp
+        mappers/mbc3.h
+        mappers/mbc3.cpp
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
 add_executable(gb_emu ${SOURCE_FILES}
-        debug/log.cpp)
+        debug/log.cpp
+        mappers/mbc3.h
+        mappers/mbc3.cpp)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -51,13 +57,17 @@ add_executable(
         ppu.cpp gui.cpp
         rendering/draw.cpp
         debug/log.cpp
+        mappers/mbc3.h
+        mappers/mbc3.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
         alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
         ppu.cpp gui.cpp
         rendering/draw.cpp
-        debug/log.cpp)
+        debug/log.cpp
+        mappers/mbc3.h
+        mappers/mbc3.cpp)
 
 target_link_libraries(
         gb_emu
