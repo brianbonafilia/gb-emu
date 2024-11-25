@@ -29,4 +29,10 @@ uint8_t Mapper::write(uint16_t addr, uint8_t val) {
   return rom_[addr];
 }
 
+uint8_t Mapper::get_bank(uint16_t addr) {
+  if (addr >= 0x4000) {
+    return 1;
+  }
+  return 0;
+}
 

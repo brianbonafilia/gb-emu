@@ -23,6 +23,10 @@ uint8_t write(uint16_t addr, uint8_t val) {
   return mapper->write(addr, val);
 }
 
+uint8_t get_bank(uint16_t addr) {
+  return mapper->get_bank(addr);
+}
+
 void load_cartridge(const char *file_path) {
   FILE *file = fopen(file_path, "rb");
   if (file == nullptr) {

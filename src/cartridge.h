@@ -14,6 +14,8 @@ namespace Cartridge {
 uint8_t read(uint16_t addr);
 uint8_t write(uint16_t addr, uint8_t val);
 
+uint8_t get_bank(uint16_t addr);
+
 void load_cartridge(const char* file_path);
 
 }  // namespace Cartridge

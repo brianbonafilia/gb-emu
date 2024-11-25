@@ -53,6 +53,18 @@ uint8_t MBC3::write(uint16_t addr, uint8_t val) {
   }
   return val;
 }
+
+uint8_t MBC3::get_bank(uint16_t addr) {
+  switch (addr) {
+    case 0x0000 ... 0x3FFF:
+      return rom_low_bank_index;
+    case 0x4000 ... 0x7FFF:
+      return rom_bank_index_;
+    default:
+      assert(false);
+  }
+}
+
 MBC3::MBC3(uint8_t *rom, int rom_size, int ram_size) : Mapper(rom){
   rom_size_ = rom_size;
   ram_size_ = ram_size;

@@ -16,7 +16,7 @@ uint8_t *oam = new uint8_t[0xA0];
 uint32_t *pixels = new uint32_t[144 * 156];
 
 int current_dot = 0;
-Registers registers;
+Registers registers {.LCDC = 0x91};
 bool debug = false;
 
 PpuState state {
@@ -116,6 +116,9 @@ void SetInterruptIfNeeded(PpuMode mode) {
 }
 
 void Step() {
+  if (!registers.ppu_enable) {
+    return;
+  }
   IncrementPosition();
   PpuMode new_mode = GetMode();
   if (new_mode != registers.mode) {
@@ -151,12 +154,14 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       return 0x90;
     case 0xFF40:
       if (m == CPU::write) {
+        bool old_ppu = registers.ppu_enable;
         registers.LCDC = val;
         if (!registers.ppu_enable) {
           printf("turning off ppu %X\n", registers.LCDC);
-          current_dot = 0;
           registers.LY = 0;
-        } else if (registers.ppu_enable) {
+          registers.current_dot = 0;
+          registers.mode = hblank;
+        } else if (!old_ppu) {
           printf("turning on ppu %X\n", registers.LCDC);
         }
       }
@@ -164,7 +169,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
     case 0xFF41:
       if (m == CPU::write) {
         printf("writing to STAT %X\n", val);
-        val &= ~(0x7);
+        val &= 0xFC;
         registers.STAT |= val;
       }
       return registers.STAT;
@@ -216,7 +221,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     default:
-      return 0x90;
+      return 0xFF;
   }
 }
 

@@ -75,7 +75,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
     case 0xE000 ... 0xFDFF:
       printf("testing?\n");
       // Not supposed to go here
-      return 0;
+      return 0xFF;
     case 0xFE00 ... 0xFE9F:
       if (m == write) {
         return PPU::write_oam(addr, val);
@@ -83,7 +83,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
       return PPU::read_oam(addr);
     case 0xFEA0 ... 0xFEFF:
       // Not usable
-      return 0;
+      return 0xFF;
     case 0XFF00:
       if (m == write) {
         val &= 0xF0;
@@ -327,20 +327,22 @@ void handleOctalOpPattern(T op, int octal_col) {
 }
 
 template<typename T>
-void performOpOnHl(T op, int bit) {
+void performOpOnHl(T op, int bit, bool update = true) {
   uint8_t HL = rd8(registers.HL);
   op(registers, HL, bit);
-  wr8(registers.HL, HL);
+  if (update) {
+    wr8(registers.HL, HL);
+  }
 }
 
 template<typename T>
-void handleOctalOpPattern(T op, int bit, int octal_col) {
+void handleOctalOpPattern(T op, int bit, int octal_col, bool update = true) {
   switch (octal_col) {
     case 0 ... 5:
       op(registers, *reg_ind[octal_col], bit);
       return;
     case 6: {
-      performOpOnHl(op, bit);
+      performOpOnHl(op, bit, update);
       return;
     }
     case 7:
@@ -381,7 +383,7 @@ void Execute_CB_Prefixed(uint8_t op_code) {
       handleOctalOpPattern(SRL, octal_col);
       return;
     case 0x8 ... 0xF:
-      handleOctalOpPattern(BIT, octal_row - 0x8, octal_col);
+      handleOctalOpPattern(BIT, octal_row - 0x8, octal_col, /*update=*/false);
       return;
     case 0x10 ... 0x17:
       handleOctalOpPattern(RES, octal_row - 0x10, octal_col);
@@ -820,8 +822,9 @@ void ProcessInstruction(bool debug) {
     printf("up in dis");
   }
   if (debug) {
+    uint8_t bank = Cartridge::get_bank(registers.PC);
     printf(
-        "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: 00:%04X (%02X %02X %02X %02X) %s\n",
+        "A: %02X F: %02X B: %02X C: %02X D: %02X E: %02X H: %02X L: %02X SP: %04X PC: %02X:%04X (%02X %02X %02X %02X) %s\n",
         registers.A,
         registers.F,
         registers.B,
@@ -831,6 +834,7 @@ void ProcessInstruction(bool debug) {
         registers.H,
         registers.L,
         registers.SP,
+        bank,
         registers.PC,
         access<read>(registers.PC),
         access<read>(registers.PC + 1),

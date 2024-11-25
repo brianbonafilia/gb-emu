@@ -12,6 +12,7 @@ class MBC1 : public Mapper {
 
   uint8_t read(uint16_t addr) override;
   uint8_t write(uint16_t addr, uint8_t val) override;
+  uint8_t get_bank(uint16_t addr) override;
 
  private:
   bool advanced_banking = false;

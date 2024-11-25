@@ -151,4 +151,4 @@ TEST(ALU, AddSPe8) {
 
 
 
-}  /// namespace
+}  // namespace
