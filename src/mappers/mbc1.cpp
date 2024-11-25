@@ -10,21 +10,23 @@
 uint8_t MBC1::read(uint16_t addr) {
   int bank_offset = 0x4000 * (rom_bank_index_ - 1);
   switch (addr) {
-    case 0x0000 ... 0x3FFF:
+    case 0x0000 ... 0x3FFF: {
       if (advanced_banking) {
-        printf("oh nozey\n");
+        printf("oh nozey");
         int low_offset = 0x4000 * (rom_low_bank_index);
-        return rom_[(int)addr + low_offset];
+        return rom_[(int) addr + low_offset];
       }
       return rom_[addr];
+    }
     case 0x4000 ... 0x7FFF:
       return rom_[(int)addr + bank_offset];
-    case 0xA000 ... 0xBFFF:
+    case 0xA000 ... 0xBFFF: {
       if (advanced_banking) {
         int low_offset = 0x4000 * (rom_low_bank_index & 0x3);
-        return ram_[(int)addr - 0xA000 + low_offset];
+        return ram_[(int) addr - 0xA000 + low_offset];
       }
-      return ram_[(int)addr - 0xA000];
+      return ram_[(int) addr - 0xA000];
+    }
     default:
       assert(false);
   }
@@ -33,7 +35,6 @@ uint8_t MBC1::read(uint16_t addr) {
 uint8_t MBC1::write(uint16_t addr, uint8_t val) {
   switch(addr){
     case 0x0000 ... 0x1FFF:
-//      printf("been writing here \n");
       if ((val & 0xF) == 0xA) {
         ram_enabled_ = true;
       }
@@ -41,7 +42,7 @@ uint8_t MBC1::write(uint16_t addr, uint8_t val) {
     case 0x2000 ... 0x3FFF:
       rom_bank_index_ = val & rom_mask_;
       if ((val & 0x1F) == 0) rom_bank_index_ = 1;
-      printf("Switching bank index to %X\n", rom_bank_index_);
+//      printf("Switching bank index to %X\n", rom_bank_index_);
       break;
     case 0x4000 ... 0x5FFF:
       printf("this would shed light?, val %X\n", val);

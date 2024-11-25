@@ -818,8 +818,10 @@ void ProcessInstruction(bool debug) {
       return;
     }
   }
-  if (registers.PC == 0x41CF) {
-    printf("up in dis");
+
+  if (registers.halt) {
+    Tick();
+    return;
   }
   if (debug) {
     uint8_t bank = Cartridge::get_bank(registers.PC);
@@ -853,10 +855,6 @@ void ProcessInstruction(bool debug) {
 //      found_break = true;
 //      std::cin.ignore();
 //    }
-  }
-  if (registers.halt) {
-    Tick();
-    return;
   }
   uint8_t op = getNextOp();
   switch (op) {

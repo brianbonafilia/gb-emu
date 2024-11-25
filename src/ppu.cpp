@@ -231,7 +231,6 @@ uint8_t write_oam(uint16_t addr, uint8_t val) {
 }
 
 uint8_t read_oam(uint16_t addr) {
-  printf("is this possibly related\n");
   return oam[addr - kOamOffset];
 }
 

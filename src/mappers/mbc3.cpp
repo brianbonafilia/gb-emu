@@ -35,7 +35,9 @@ uint8_t MBC3::write(uint16_t addr, uint8_t val) {
       break;
     case 0x2000 ... 0x3FFF:
       rom_bank_index_ = val & rom_mask_;
-      if ((val & 0x1F) == 0) rom_bank_index_ = 1;
+      if (val == 0) {
+        rom_bank_index_ = 1;
+      }
       break;
     case 0x4000 ... 0x5FFF:
       printf("this would shed light?, val %X\n", val);

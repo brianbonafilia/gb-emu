@@ -162,7 +162,7 @@ void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attribute
     sprite_rows = 16;
   }
   for (int row_idx = 0; row_idx < sprite_rows; ++row_idx) {
-    if (row + row_idx < 0) {
+    if (row + row_idx < 0 || row + row_idx >= 144) {
       continue;
     }
     int sprite_row = row_idx;
@@ -234,7 +234,6 @@ void DrawOam(const PpuState& state) {
     SpriteAttributes attributes{.attr = state.oam[i + 3]};
     int sprite_addr = GetSpriteAddr(tile_idx);
     DrawSprite(state, sprite_addr, attributes, row, col, state.pixels);
-
   }
 }
 
