@@ -56,6 +56,7 @@ void load_cartridge(const char *file_path) {
     case 3:
       mapper = new MBC1(data, rom_size, ram_size);
       break;
+    case 0x10:
     case 0x13:
       mapper = new MBC3(data, rom_size, ram_size);
       break;

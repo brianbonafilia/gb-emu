@@ -89,6 +89,9 @@ MBC3::MBC3(uint8_t *rom, int rom_size, int ram_size) : Mapper(rom){
     case 5:
       rom_mask_ = 0x3F;
       break;
+    case 6:
+      rom_mask_ = 0x7F;
+      break;
     default:
       exit(1);
   }

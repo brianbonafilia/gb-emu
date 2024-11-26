@@ -12,7 +12,6 @@ uint8_t MBC1::read(uint16_t addr) {
   switch (addr) {
     case 0x0000 ... 0x3FFF: {
       if (advanced_banking) {
-        printf("oh nozey");
         int low_offset = 0x4000 * (rom_low_bank_index);
         return rom_[(int) addr + low_offset];
       }

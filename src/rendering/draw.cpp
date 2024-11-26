@@ -3,9 +3,7 @@
 //
 
 #include <cassert>
-#include <cstdio>
 #include "draw.h"
-#include "../ppu.h"
 #include "../gui.h"
 
 namespace PPU {
@@ -234,33 +232,6 @@ void DrawOam(const PpuState& state) {
     SpriteAttributes attributes{.attr = state.oam[i + 3]};
     int sprite_addr = GetSpriteAddr(tile_idx);
     DrawSprite(state, sprite_addr, attributes, row, col, state.pixels);
-  }
-}
-
-void DrawBackground(const PpuState& state, uint32_t *pixels) {
-  int tile_map_offset = state.registers.bg_tile_map ? 0x1C00 : 0x1800;
-  for (int row = 0; row < 18; ++row) {
-    for (int col = 0; col < 20; ++col) {
-      uint8_t tile_idx = state.vram[tile_map_offset + (row * 32) + col];
-      int vram_location = GetTileAddr(state, tile_idx);
-      DrawTile(state, vram_location, col * 8, row * 8, pixels);
-    }
-  }
-}
-
-void DrawWindow(const PpuState& state, uint32_t *pixels) {
-  if (!state.registers.window_enable) {
-    return;
-  }
-  int tile_map_offset = state.registers.window_tile_map ? 0x1C00 : 0x1800;
-  int colOffset = state.registers.WX - 7;
-  int rowOffset = state.registers.WY;
-  for (int row = 0; row < 18; ++row) {
-    for (int col = 0; col < 20; ++col) {
-      uint8_t tile_idx = state.vram[tile_map_offset + (row * 32) + col];
-      int vram_location = GetTileAddr(state, tile_idx);
-      DrawTile(state, vram_location, col * 8 + colOffset, row * 8 + rowOffset, pixels);
-    }
   }
 }
 
