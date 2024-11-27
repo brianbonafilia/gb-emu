@@ -3,11 +3,19 @@
 //
 
 #include "mapper.h"
-#include <cstdio>
 
 Mapper::Mapper(uint8_t *rom) {
   rom_ = rom;
   ram_ = new uint8_t[0x2000];
+}
+
+Mapper::Mapper(uint8_t *rom, uint8_t* ram) {
+  rom_ = rom;
+  if (ram == nullptr) {
+    ram_ = new uint8_t[0x2000];
+  } else {
+    ram_ = ram;
+  }
 }
 
 Mapper::~Mapper() {
@@ -34,5 +42,9 @@ uint8_t Mapper::get_bank(uint16_t addr) {
     return 1;
   }
   return 0;
+}
+
+uint8_t* Mapper::get_ram() {
+  return ram_;
 }
 

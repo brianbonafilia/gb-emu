@@ -19,7 +19,10 @@ uint8_t MBC3::read(uint16_t addr) {
     case 0x4000 ... 0x7FFF:
       return rom_[addr + bank_offset];
     case 0xA000 ... 0xBFFF: {
-      int low_offset = 0x4000 * (rom_low_bank_index & 0x3);
+      if (!ram_enabled_) {
+        return 0xFF;
+      }
+      int low_offset = 0x2000 * (rom_low_bank_index & 0x3);
       return ram_[addr - 0xA000 + low_offset];
     }
     default:
@@ -46,10 +49,14 @@ uint8_t MBC3::write(uint16_t addr, uint8_t val) {
       printf("this would be helpful %X\n", val);
       advanced_banking = val & 1;
       break;
-    case 0xA000 ... 0xBFFF:
-//      printf("ok i'm writing to ram? %X : %X\n", val, addr);
-      ram_[addr - 0xA000] = val;
-      break;
+    case 0xA000 ... 0xBFFF: {
+      if (!ram_enabled_) {
+        return 0xFF;
+      }
+      int low_offset = 0x2000 * (rom_low_bank_index & 0x3);
+      ram_[addr - 0xA000 + low_offset] = val;
+      return val;
+    }
     default:
       printf("other write detected, %X %X\n", addr, val);
   }
@@ -59,15 +66,17 @@ uint8_t MBC3::write(uint16_t addr, uint8_t val) {
 uint8_t MBC3::get_bank(uint16_t addr) {
   switch (addr) {
     case 0x0000 ... 0x3FFF:
-      return rom_low_bank_index;
+      return 0;
     case 0x4000 ... 0x7FFF:
       return rom_bank_index_;
+    case 0xA000 ... 0xBFFF:
+      return rom_low_bank_index;
     default:
-      assert(false);
+      return 0;
   }
 }
 
-MBC3::MBC3(uint8_t *rom, int rom_size, int ram_size) : Mapper(rom){
+MBC3::MBC3(uint8_t *rom, uint8_t* ram, int rom_size, int ram_size) : Mapper(rom, ram){
   rom_size_ = rom_size;
   ram_size_ = ram_size;
   switch (rom_size_) {

@@ -4,6 +4,7 @@
 
 #include <SDL2/SDL.h>
 #include <iostream>
+#include "cartridge.h"
 #include <cstdint>
 #include <random>
 #include <cassert>
@@ -63,6 +64,10 @@ void SetControllerState(CPU::Joypad& controller) {
   }
 }
 
+void Save() {
+  Cartridge::Save();
+}
+
 void Init(bool debug) {
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS) < 0) {
     std::cerr << "Failed to initialize video" << std::endl;
@@ -118,6 +123,9 @@ void Init(bool debug) {
         switch (e.key.keysym.sym) {
           case SDLK_UP:
             direction.select_or_up = false;
+            break;
+          case SDLK_s:
+            Save();
             break;
           case SDLK_DOWN:
             direction.start_or_down = false;
@@ -177,7 +185,7 @@ void Init(bool debug) {
     if (latency < kFrameTimeInMs) {
       SDL_Delay(kFrameTimeInMs - latency);
     } else {
-      printf("not hitting desired frame rate\n");
+//      printf("not hitting desired frame rate\n");
     }
   }
 

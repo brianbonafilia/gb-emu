@@ -15,8 +15,10 @@ class Mapper {
   virtual uint8_t read(uint16_t addr);
   virtual uint8_t write(uint16_t addr, uint8_t val);
   virtual uint8_t get_bank(uint16_t addr);
+  virtual uint8_t* get_ram();
 
  protected:
+  Mapper(uint8_t* rom, uint8_t* ram);
   uint8_t* rom_;
   uint8_t* ram_;
 };

@@ -20,6 +20,9 @@ uint8_t MBC1::read(uint16_t addr) {
     case 0x4000 ... 0x7FFF:
       return rom_[(int)addr + bank_offset];
     case 0xA000 ... 0xBFFF: {
+      if (!ram_enabled_) {
+        return 0xFF;
+      }
       if (advanced_banking) {
         int low_offset = 0x4000 * (rom_low_bank_index & 0x3);
         return ram_[(int) addr - 0xA000 + low_offset];
@@ -74,7 +77,7 @@ uint8_t MBC1::get_bank(uint16_t addr) {
   }
 }
 
-MBC1::MBC1(uint8_t *rom, int rom_size, int ram_size) : Mapper(rom){
+MBC1::MBC1(uint8_t* rom, uint8_t* ram, int rom_size, int ram_size) : Mapper(rom, ram){
   rom_size_ = rom_size;
   ram_size_ = ram_size;
   switch (rom_size_) {

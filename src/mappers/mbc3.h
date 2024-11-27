@@ -8,7 +8,7 @@
 #include "../mapper.h"
 class MBC3 : public Mapper {
  public:
-  explicit MBC3(uint8_t* rom, int rom_size, int ram_size);
+  explicit MBC3(uint8_t* rom, uint8_t* ram, int rom_size, int ram_size);
 
   uint8_t read(uint16_t addr) override;
   uint8_t write(uint16_t addr, uint8_t val) override;
