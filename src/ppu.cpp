@@ -151,7 +151,7 @@ void dot() {
 uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
   switch (addr) {
     case 0xFF10 ... 0xFF3F:
-      return 0x90;
+      return 0x00;
     case 0xFF40:
       if (m == CPU::write) {
         bool old_ppu = registers.ppu_enable;
@@ -221,7 +221,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     default:
-      return 0xFF;
+      return 0x00;
   }
 }
 

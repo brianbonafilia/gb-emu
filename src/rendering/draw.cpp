@@ -211,9 +211,9 @@ void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attribute
 
 int MinRowVal(const Registers& registers) {
   if (registers.obj_sz) {
-    return 0;
+    return -16;
   }
-  return 8;
+  return -8;
 }
 
 void DrawOam(const PpuState& state) {
