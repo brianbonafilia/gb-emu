@@ -138,7 +138,7 @@ uint16_t rd16(uint16_t addr);
 uint8_t wr8(uint16_t addr, uint8_t val);
 
 // Power up sequence initialize registers;
-void InitializeRegisters();
+void InitializeRegisters(bool cgb_mode = false);
 
 // Fetch the latest instructions and Execute them
 void ProcessInstruction(bool debug = false);

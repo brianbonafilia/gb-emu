@@ -3,6 +3,7 @@
 //
 
 #include <cassert>
+#include <cstdio>
 #include "draw.h"
 #include "../gui.h"
 
@@ -36,6 +37,18 @@ bool IsInWindow(const PpuState& state) {
   return state.registers.LY >= state.registers.WY;
 }
 
+void SetWindowColorAttrs(const PpuState& state, int x_tile, int y_tile) {
+  if (state.registers.cgb_mode) {
+    state.registers.bg_attrs.attr = state.vram_bank1[GetWindowOffset(state.registers) + x_tile + y_tile * 32];
+  }
+}
+
+void SetBgColorAttrs(const PpuState& state, int x_tile, int y_tile) {
+  if (state.registers.cgb_mode) {
+    state.registers.bg_attrs.attr = state.vram_bank1[GetBgOffset(state.registers) + x_tile + y_tile * 32];
+  }
+}
+
 void SetWindowTileLowHigh(const PpuState& state) {
   int window_x = state.registers.x_pos + 8 - state.registers.WX;
   int window_y = state.registers.LY - state.registers.WY;
@@ -47,6 +60,7 @@ void SetWindowTileLowHigh(const PpuState& state) {
   state.registers.bg_step = window_x % 8;
   state.registers.bg_low = state.vram[tile_addr + tile_row * 2];
   state.registers.bg_high = state.vram[tile_addr + tile_row * 2 + 1];
+  SetWindowColorAttrs(state, x_tile, y_tile);
 }
 
 void SetBgTileLowHigh(const PpuState& state) {
@@ -63,7 +77,53 @@ void SetBgTileLowHigh(const PpuState& state) {
   state.registers.bg_step = bg_x_pos % 8;
   state.registers.bg_low = state.vram[tile_addr + tile_row * 2];
   state.registers.bg_high = state.vram[tile_addr + tile_row * 2 + 1];
+  SetBgColorAttrs(state, x_tile, y_tile);
 
+
+}
+
+ColorPalette GetColorPalette(const PpuState& state, BgWindowAttributes attributes) {
+  assert(attributes.bank == 0);
+  ColorPalette color_palette {};
+  Color color {};
+  for (int i = 0; i < 4; ++i) {
+    color.val = state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2 + 1] |
+        (state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2] << 8);
+    switch (i) {
+      case 0:
+        color_palette.color0 = color;
+        break;
+      case 1:
+        color_palette.color1 = color;
+        break;
+      case 2:
+        color_palette.color2 = color;
+        break;
+      case 3:
+        color_palette.color3 = color;
+        break;
+    }
+  }
+  return color_palette;
+}
+
+void PushBgWindowColorPixel(int pixel, int val, ColorPalette color_palette, uint32_t *pixels) {
+  switch (val) {
+    case 0:
+      pixels[pixel] = ToRgb888(color_palette.color0);
+      break;
+    case 1:
+      pixels[pixel] = ToRgb888(color_palette.color1);
+      break;
+    case 2:
+      pixels[pixel] = ToRgb888(color_palette.color2);
+      break;
+    case 3:
+      pixels[pixel] = ToRgb888(color_palette.color3);
+      break;
+    default:
+      assert(false);
+  }
 }
 
 void PushPixel(const PpuState& state) {
@@ -74,6 +134,10 @@ void PushPixel(const PpuState& state) {
   if (bg_mask & state.registers.bg_high) color_idx += 2;
 
   int pixel = state.registers.x_pos + state.registers.LY * 160;
+  if (state.registers.cgb_mode) {
+    PushBgWindowColorPixel(pixel, color_idx, GetColorPalette(state, state.registers.bg_attrs), state.pixels);
+  }
+  else {
   switch (color_idx) {
     case 0:
       state.pixels[pixel] = kGreyPalette[state.registers.bgp_id0];
@@ -89,10 +153,8 @@ void PushPixel(const PpuState& state) {
       break;
     default:
       assert(false);
-
+}
   }
-//  printf("low is %X,  high is %X, bg_step is %d\n", state.registers.bg_low, state.registers.bg_high, bg_step);
-//  printf("the pixel is %X, LY is %d color is %X\n", pixel, state.registers.LY, state.pixels[pixel]);
 
 }
 
@@ -147,6 +209,49 @@ int GetSpriteAddr(int tile_idx) {
   return tile_idx * 16;
 }
 
+ColorPalette GetColorPalette(const PpuState& state, SpriteAttributes attributes) {
+  assert(attributes.bank == 0);
+  ColorPalette color_palette {};
+  Color color {};
+  for (int i = 0; i < 4; ++i) {
+    color.val = state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2 + 1] |
+        (state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2] << 8);
+    switch (i) {
+      case 0:
+        color_palette.color0 = color;
+        break;
+      case 1:
+        color_palette.color1 = color;
+        break;
+      case 2:
+        color_palette.color2 = color;
+        break;
+      case 3:
+        color_palette.color3 = color;
+        break;
+    }
+  }
+  return color_palette;
+}
+
+void PushObjColorPixel(int pixel, int val, ColorPalette color_palette, uint32_t *pixels) {
+  switch (val) {
+    case 0:
+      break;
+    case 1:
+      pixels[pixel] = ToRgb888(color_palette.color1);
+      break;
+    case 2:
+      pixels[pixel] = ToRgb888(color_palette.color2);
+      break;
+    case 3:
+      pixels[pixel] = ToRgb888(color_palette.color3);
+      break;
+    default:
+      assert(false);
+  }
+}
+
 void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t *pixels) {
   Palette palette {};
   if (attributes.dmg_palette) {
@@ -184,20 +289,24 @@ void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attribute
       int val = 0;
       if (left_byte & mask) val += 1;
       if (right_byte & mask) val += 2;
-      switch (val) {
-        case 0:
-          break;
-        case 1:
-          pixels[pixel] = kGreyPalette[palette.color1];
-          break;
-        case 2:
-          pixels[pixel] = kGreyPalette[palette.color2];
-          break;
-        case 3:
-          pixels[pixel] = kGreyPalette[palette.color3];
-          break;
-        default:
-          assert(false);
+      if (state.registers.cgb_mode) {
+        PushObjColorPixel(pixel, val, GetColorPalette(state, attributes), pixels);
+      } else {
+        switch (val) {
+          case 0:
+            break;
+          case 1:
+            pixels[pixel] = kGreyPalette[palette.color1];
+            break;
+          case 2:
+            pixels[pixel] = kGreyPalette[palette.color2];
+            break;
+          case 3:
+            pixels[pixel] = kGreyPalette[palette.color3];
+            break;
+          default:
+            assert(false);
+        }
       }
       --shift;
       if (attributes.flip_x) {

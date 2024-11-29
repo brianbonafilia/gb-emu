@@ -19,6 +19,6 @@ int main(int argc, char* argv[]) {
     std::cerr << "must include a rom to play :) " << std::endl;
   }
   Cartridge::load_cartridge(argv[argc - 1]);
-  CPU::InitializeRegisters();
+  CPU::InitializeRegisters(Cartridge::IsCgbMode());
   GUI::Init(debug);
 }

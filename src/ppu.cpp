@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cassert>
 #include "ppu.h"
 #include "cpu.h"
 #include "gui.h"
@@ -12,6 +13,7 @@
 namespace PPU {
 namespace {
 uint8_t *vram = new uint8_t[0x2000];
+uint8_t *vram_bank1 = new uint8_t[0x2000];
 uint8_t *oam = new uint8_t[0xA0];
 uint32_t *pixels = new uint32_t[144 * 156];
 
@@ -22,10 +24,10 @@ bool debug = false;
 PpuState state {
     .registers = registers,
     .vram = vram,
+    .vram_bank1 = vram_bank1,
     .oam = oam,
     .pixels = pixels,
 };
-
 
 void SetVblankInterrupt() {
   if (!registers.ppu_enable) return;
@@ -45,6 +47,10 @@ void DmaTransfer(uint8_t idx) {
   for (int i = 0; i < 0xA0; ++i) {
     oam[i] = CPU::access<CPU::read>((idx << 8) | i);
   }
+}
+
+uint32_t ExtendBits(uint32_t bits) {
+  return (bits << 3) | (bits >> 2);
 }
 
 // Update the location of the current dot and line.
@@ -81,11 +87,17 @@ void set_debug(bool setting) {
 }
 
 uint8_t read_vram(uint16_t addr) {
-  // TODO: for gameboy color eventually, needs banking
+  if (registers.attr_bank) {
+    return vram_bank1[addr - 0x8000];
+  }
   return vram[addr - 0x8000];
 }
 
 uint8_t write_vram(uint16_t addr, uint8_t val) {
+  if (registers.attr_bank) {
+    vram_bank1[addr - 0x8000] = val;
+    return vram_bank1[addr - 0x8000];
+  }
   vram[addr - 0x8000] = val;
   return vram[addr - 0x8000];
 }
@@ -220,6 +232,43 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
         registers.WX = val;
       }
       return registers.WX;
+    case 0xFF4D:
+      assert(false);
+    case 0xFF4F:
+      if (m == CPU::write) {
+        registers.attr_bank = val & 1;
+      }
+      return registers.attr_bank;
+    case 0xFF68:
+      if (m == CPU::write) {
+        registers.bcps = val;
+      }
+      return registers.bcps;
+    case 0xFF69:
+      if (m == CPU::write) {
+        registers.bg_cram[registers.bg_color_addr] = val;
+        if (registers.bg_auto_increment_color_addr) {
+          registers.bg_color_addr++;
+        }
+        return val;
+      }
+      return registers.bg_cram[registers.bg_color_addr];
+    case 0xFF6A:
+      if (m == CPU::write) {
+        registers.ocps = val;
+      }
+      return registers.ocps;
+    case 0xFF6B:
+      if (m == CPU::write) {
+        registers.obj_cram[registers.obj_color_addr] = val;
+        if (registers.obj_auto_increment_color_addr) {
+          registers.obj_color_addr++;
+        }
+        return val;
+      }
+      return registers.bg_cram[registers.obj_color_addr];
+    case 0xFF70:
+      assert(false);
     default:
       return 0x00;
   }
@@ -232,6 +281,15 @@ uint8_t write_oam(uint16_t addr, uint8_t val) {
 
 uint8_t read_oam(uint16_t addr) {
   return oam[addr - kOamOffset];
+}
+
+void set_cgb_mode(bool cgb_mode) {
+  registers.cgb_mode = cgb_mode;
+}
+
+
+uint32_t ToRgb888(Color c) {
+  return (ExtendBits(c.blue) << 16) | (ExtendBits(c.green) << 8) | ExtendBits(c.red);
 }
 
 }  // namespace PPU

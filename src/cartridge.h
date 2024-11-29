@@ -16,6 +16,8 @@ uint8_t write(uint16_t addr, uint8_t val);
 
 void Save();
 
+bool IsCgbMode();
+
 uint8_t get_bank(uint16_t addr);
 
 void load_cartridge(const char* file_path);

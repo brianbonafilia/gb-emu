@@ -7,7 +7,6 @@
 #include <iostream>
 #include <utility>
 #include "mapper.h"
-#include "cpu.h"
 #include "mappers/mbc1.h"
 #include "mappers/mbc3.h"
 
@@ -61,6 +60,10 @@ void SetRamSize(int size) {
     default:
       ram_size_bytes = 0;
   }
+}
+
+bool IsCgbMode() {
+  return data[0x143] & 0x80;
 }
 
 uint8_t* GetRam() {
@@ -117,6 +120,7 @@ void load_cartridge(const char *file_path) {
       mapper = new MBC1(data, ram, rom_size, ram_size);
       break;
     case 0x10:
+    case 0x1b:  //TODO: make MBC 5 for this
     case 0x13:
       mapper = new MBC3(data, ram, rom_size, ram_size);
       break;

@@ -1,6 +1,7 @@
 set(CMAKE_CXX_STANDARD 17)
 add_library(cpu cpu.cpp cpu.h
         cartridge.cpp
+        ppu.cpp ppu.h
         cartridge.h alu.cpp alu.h mapper.cpp
         rendering/draw.cpp
         debug/log.cpp
@@ -61,6 +62,12 @@ add_executable(
         mappers/mbc3.cpp
 )
 
+add_executable(
+        ppu_test debug/log.cpp rendering/draw.cpp gui.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp mappers/mbc3.cpp
+        ppu.cpp cpu.cpp gui.cpp alu.cpp
+        ppu_test.cpp
+)
+
 add_executable(alu_test alu.cpp cpu.cpp
         alu_test.cpp mapper.cpp cartridge.cpp mappers/mbc1.cpp
         ppu.cpp gui.cpp
@@ -80,6 +87,11 @@ target_link_libraries(
 )
 
 target_link_libraries(
+        ppu_test
+        SDL2::SDL2
+)
+
+target_link_libraries(
         alu_test
         SDL2::SDL2
 )
@@ -92,7 +104,12 @@ target_link_libraries(
         alu_test
         GTest::gtest_main
 )
+target_link_libraries(
+        ppu_test
+        GTest::gtest_main
+)
 
 include(GoogleTest)
 gtest_discover_tests(cpu_test)
 gtest_discover_tests(alu_test)
+gtest_discover_tests(ppu_test)

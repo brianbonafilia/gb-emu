@@ -37,6 +37,24 @@ union SpriteAttributes {
   uint8_t attr;
 };
 
+union BgWindowAttributes {
+  struct {
+    // CGB select palette
+    uint8_t cgb_palette : 3;
+    // CGB select vrom bank
+    uint8_t bank : 1;
+    // empty
+    uint8_t  : 1;
+    // horizontally mirror
+    bool flip_x : 1;
+    // vertically mirror
+    bool flip_y : 1;
+    // if true, draw over OBJs
+    bool priority : 1;
+  };
+  uint8_t attr;
+};
+
 union Palette {
   struct {
     uint8_t color0: 2;
@@ -45,6 +63,26 @@ union Palette {
     uint8_t color3: 2;
   };
   uint8_t val;
+};
+
+union Color {
+  struct {
+    uint8_t red: 5;
+    uint8_t green: 5;
+    uint8_t blue: 5;
+    uint8_t : 1;
+  };
+  uint16_t val : 16;
+};
+
+
+uint32_t ToRgb888(Color c);
+
+struct ColorPalette {
+  Color color0;
+  Color color1;
+  Color color2;
+  Color color3;
 };
 
 enum PpuMode {
@@ -115,6 +153,7 @@ struct Registers {
   Palette obj_pallete;
   uint8_t bg_low;
   uint8_t bg_high;
+  BgWindowAttributes bg_attrs;
   uint8_t obj_low;
   uint8_t obj_high;
 
@@ -151,6 +190,34 @@ struct Registers {
     uint8_t OBP1;
   };
 
+  /* GBC related registers */
+  bool attr_bank = false;
+  bool cgb_mode = false;
+
+  // Background color palette specification or background palette index
+  union {
+    struct {
+      uint8_t bg_color_addr : 6;
+      uint8_t : 1;
+      bool bg_auto_increment_color_addr : 1;
+    };
+    uint8_t bcps;
+  };
+
+  uint8_t* bg_cram = new uint8_t[64];
+
+  // Object color palette data
+  union {
+    struct {
+      uint8_t obj_color_addr : 6;
+      uint8_t : 1;
+      bool obj_auto_increment_color_addr : 1;
+    };
+    uint8_t ocps;
+  };
+
+  uint8_t* obj_cram = new uint8_t[64];
+
   Registers() = default;
 };
 
@@ -159,6 +226,7 @@ struct Registers {
 struct PpuState {
   Registers& registers;
   uint8_t* vram;
+  uint8_t* vram_bank1;
   uint8_t* oam;
   uint32_t* pixels;
 };
@@ -178,6 +246,7 @@ void dot();
 uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val = 0);
 
 void set_debug(bool setting);
+void set_cgb_mode(bool cgb_mode);
 
 }  // namespace PPU
 

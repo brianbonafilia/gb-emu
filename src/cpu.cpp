@@ -231,9 +231,10 @@ void Tick() {
   next_op_ready = true;
 }
 
-void InitializeRegisters() {
+void InitializeRegisters(bool cgb_mode) {
+  PPU::set_cgb_mode(cgb_mode);
   // CPU registers
-  registers.A = 0x01;
+  registers.A = cgb_mode ? 0x11 : 0x1;
   registers.zf = 1;
   registers.nf = 0;
   registers.hf = 1;
