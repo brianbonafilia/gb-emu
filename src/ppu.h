@@ -57,22 +57,26 @@ union BgWindowAttributes {
 
 union Palette {
   struct {
-    uint8_t color0: 2;
-    uint8_t color1: 2;
-    uint8_t color2: 2;
-    uint8_t color3: 2;
+    uint8_t color0 : 2;
+    uint8_t color1 : 2;
+    uint8_t color2 : 2;
+    uint8_t color3 : 2;
   };
   uint8_t val;
 };
 
-union Color {
-  struct {
-    uint8_t red: 5;
-    uint8_t green: 5;
-    uint8_t blue: 5;
-    uint8_t : 1;
-  };
-  uint16_t val : 16;
+struct Color {
+  uint16_t val;
+  uint32_t blue() {
+    return (val & (0x1F << 10)) >> 10;
+  }
+  uint32_t green() {
+    return (val & (0x1F << 5)) >> 5;
+  }
+  uint32_t red() {
+    return (val & 0x1F);
+  }
+
 };
 
 

@@ -289,7 +289,7 @@ void set_cgb_mode(bool cgb_mode) {
 
 
 uint32_t ToRgb888(Color c) {
-  return (ExtendBits(c.blue) << 16) | (ExtendBits(c.green) << 8) | ExtendBits(c.red);
+  return (ExtendBits(c.red()) << 16) | (ExtendBits(c.green()) << 8) | ExtendBits(c.blue());
 }
 
 }  // namespace PPU

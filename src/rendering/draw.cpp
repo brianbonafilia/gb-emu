@@ -87,8 +87,8 @@ ColorPalette GetColorPalette(const PpuState& state, BgWindowAttributes attribute
   ColorPalette color_palette {};
   Color color {};
   for (int i = 0; i < 4; ++i) {
-    color.val = state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2 + 1] |
-        (state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2] << 8);
+    color.val = state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2] |
+        (state.registers.bg_cram[attributes.cgb_palette * 8 + i * 2 + 1] << 8);
     switch (i) {
       case 0:
         color_palette.color0 = color;
@@ -214,8 +214,8 @@ ColorPalette GetColorPalette(const PpuState& state, SpriteAttributes attributes)
   ColorPalette color_palette {};
   Color color {};
   for (int i = 0; i < 4; ++i) {
-    color.val = state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2 + 1] |
-        (state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2] << 8);
+    color.val = state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2] |
+        (state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2 + 1] << 8);
     switch (i) {
       case 0:
         color_palette.color0 = color;
