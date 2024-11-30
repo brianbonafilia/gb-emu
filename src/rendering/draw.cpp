@@ -63,6 +63,93 @@ void SetWindowTileLowHigh(const PpuState& state) {
   SetWindowColorAttrs(state, x_tile, y_tile);
 }
 
+
+ColorPalette GetColorPalette(const PpuState& state, SpriteAttributes attributes) {
+  assert(attributes.bank == 0);
+  ColorPalette color_palette {};
+  Color color {};
+  for (int i = 0; i < 4; ++i) {
+    color.val = state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2] |
+        (state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2 + 1] << 8);
+    switch (i) {
+      case 0:
+        color_palette.color0 = color;
+        break;
+      case 1:
+        color_palette.color1 = color;
+        break;
+      case 2:
+        color_palette.color2 = color;
+        break;
+      case 3:
+        color_palette.color3 = color;
+        break;
+    }
+  }
+  return color_palette;
+}
+
+void PushObjColorPixel(int pixel, int val, ColorPalette color_palette, uint32_t *pixels) {
+  switch (val) {
+    case 0:
+      break;
+    case 1:
+      pixels[pixel] = ToRgb888(color_palette.color1);
+      break;
+    case 2:
+      pixels[pixel] = ToRgb888(color_palette.color2);
+      break;
+    case 3:
+      pixels[pixel] = ToRgb888(color_palette.color3);
+      break;
+    default:
+      assert(false);
+  }
+}
+
+int ObjSz(const PpuState& state) {
+  return state.registers.obj_sz ? 16 : 8;
+}
+
+int FindObjOamIdx(const PpuState& state, int x, int y) {
+  for (int i = 0; i < 0xA0; i+=4) {
+    int row = state.oam[i];
+    int col = state.oam[i + 1];
+    int row_low = row - ObjSz(state);
+    int col_low = col - 8;
+    if (y >= row_low && y < row && x >= col_low && x < col) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+void SetObjTileLowHigh(const PpuState& state) {
+  int x = state.registers.x_pos;
+  int y = state.registers.LY;
+  int oam_index = FindObjOamIdx(state, x, y);
+  if (oam_index < 0) {
+    state.registers.obj_step = -1;
+    return;
+  }
+  int row = state.oam[oam_index] - ObjSz(state);
+  int col = state.oam[oam_index + 1] - 8;
+  uint8_t tile_idx = state.oam[oam_index + 2];
+  SpriteAttributes attributes{.attr = state.oam[oam_index + 3]};
+  int sprite_addr = GetSpriteAddr(tile_idx);
+  int tile_row = y - row;
+  if (attributes.flip_y) {
+    tile_row = ObjSz(state) - tile_row;
+  }
+
+  state.registers.obj_step = (x - col);
+  assert(state.registers.obj_step >= 0 && state.registers.obj_step < 8);
+  state.registers.obj_low = state.vram[sprite_addr + tile_row * 2];
+  state.registers.obj_high = state.vram[sprite_addr + tile_row * 2 + 1];
+  state.registers.obj_attrs = attributes;
+
+}
+
 void SetBgTileLowHigh(const PpuState& state) {
   int bg_x_pos = state.registers.SCX + state.registers.x_pos;
   int bg_y_pos = state.registers.SCY + state.registers.LY;
@@ -78,8 +165,6 @@ void SetBgTileLowHigh(const PpuState& state) {
   state.registers.bg_low = state.vram[tile_addr + tile_row * 2];
   state.registers.bg_high = state.vram[tile_addr + tile_row * 2 + 1];
   SetBgColorAttrs(state, x_tile, y_tile);
-
-
 }
 
 ColorPalette GetColorPalette(const PpuState& state, BgWindowAttributes attributes) {
@@ -126,34 +211,84 @@ void PushBgWindowColorPixel(int pixel, int val, ColorPalette color_palette, uint
   }
 }
 
-void PushPixel(const PpuState& state) {
+void PushBgPixel(int pixel, int color_idx, const PpuState& state) {
+  if (state.registers.cgb_mode) {
+    PushBgWindowColorPixel(pixel, color_idx, GetColorPalette(state, state.registers.bg_attrs), state.pixels);
+  } else {
+    switch (color_idx) {
+      case 0:
+        state.pixels[pixel] = kGreyPalette[state.registers.bgp_id0];
+        break;
+      case 1:
+        state.pixels[pixel] = kGreyPalette[state.registers.bgp_id1];
+        break;
+      case 2:
+        state.pixels[pixel] = kGreyPalette[state.registers.bgp_id2];
+        break;
+      case 3:
+        state.pixels[pixel] = kGreyPalette[state.registers.bgp_id3];
+        break;
+      default:
+        assert(false);
+    }
+  }
+}
+
+void PushObjPixel(int pixel, int color_idx, const PpuState& state) {
+  if (state.registers.cgb_mode) {
+    PushObjColorPixel(pixel, color_idx,
+                      GetColorPalette(state, state.registers.obj_attrs), state.pixels);
+  } else {
+    Palette palette {};
+    if (state.registers.obj_attrs.dmg_palette) {
+      palette.val = state.registers.OBP1;
+    } else {
+      palette.val = state.registers.OBP0;
+    }
+    switch (color_idx) {
+      case 0:
+        state.pixels[pixel] = kGreyPalette[palette.color0];
+        break;
+      case 1:
+        state.pixels[pixel] = kGreyPalette[palette.color1];
+        break;
+      case 2:
+        state.pixels[pixel] = kGreyPalette[palette.color2];
+        break;
+      case 3:
+        state.pixels[pixel] = kGreyPalette[palette.color3];
+        break;
+      default:
+        assert(false);
+    }
+  }
+}
+
+void PushPixel(const PpuState &state) {
   int bg_step = state.registers.bg_step;
   uint8_t bg_mask = 0x80 >> bg_step;
   int color_idx = 0;
   if (bg_mask & state.registers.bg_low) color_idx++;
   if (bg_mask & state.registers.bg_high) color_idx += 2;
 
-  int pixel = state.registers.x_pos + state.registers.LY * 160;
-  if (state.registers.cgb_mode) {
-    PushBgWindowColorPixel(pixel, color_idx, GetColorPalette(state, state.registers.bg_attrs), state.pixels);
+
+  int obj_color_idx = 0;
+  if (state.registers.obj_step >= 0) {
+    uint8_t obj_mask = 0x80 >> state.registers.obj_step;
+    if (state.registers.obj_attrs.flip_x) {
+      obj_mask = 0x01 << state.registers.obj_step;
+    }
+    if (obj_mask & state.registers.obj_low) obj_color_idx++;
+    if (obj_mask & state.registers.obj_high) obj_color_idx += 2;
   }
-  else {
-  switch (color_idx) {
-    case 0:
-      state.pixels[pixel] = kGreyPalette[state.registers.bgp_id0];
-      break;
-    case 1:
-      state.pixels[pixel] = kGreyPalette[state.registers.bgp_id1];
-      break;
-    case 2:
-      state.pixels[pixel] = kGreyPalette[state.registers.bgp_id2];
-      break;
-    case 3:
-      state.pixels[pixel] = kGreyPalette[state.registers.bgp_id3];
-      break;
-    default:
-      assert(false);
-}
+
+  int pixel = state.registers.x_pos + state.registers.LY * 160;
+  if (obj_color_idx == 0)  {
+    PushBgPixel(pixel, color_idx, state);
+  } else if (color_idx > 0 && state.registers.obj_attrs.priority) {
+    PushBgPixel(pixel, color_idx, state);
+  } else {
+    PushObjPixel(pixel, obj_color_idx, state);
   }
 
 }
@@ -207,49 +342,6 @@ int GetTileAddr(const PpuState& state, int tile_idx) {
 
 int GetSpriteAddr(int tile_idx) {
   return tile_idx * 16;
-}
-
-ColorPalette GetColorPalette(const PpuState& state, SpriteAttributes attributes) {
-  assert(attributes.bank == 0);
-  ColorPalette color_palette {};
-  Color color {};
-  for (int i = 0; i < 4; ++i) {
-    color.val = state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2] |
-        (state.registers.obj_cram[attributes.cgb_palette * 8 + i * 2 + 1] << 8);
-    switch (i) {
-      case 0:
-        color_palette.color0 = color;
-        break;
-      case 1:
-        color_palette.color1 = color;
-        break;
-      case 2:
-        color_palette.color2 = color;
-        break;
-      case 3:
-        color_palette.color3 = color;
-        break;
-    }
-  }
-  return color_palette;
-}
-
-void PushObjColorPixel(int pixel, int val, ColorPalette color_palette, uint32_t *pixels) {
-  switch (val) {
-    case 0:
-      break;
-    case 1:
-      pixels[pixel] = ToRgb888(color_palette.color1);
-      break;
-    case 2:
-      pixels[pixel] = ToRgb888(color_palette.color2);
-      break;
-    case 3:
-      pixels[pixel] = ToRgb888(color_palette.color3);
-      break;
-    default:
-      assert(false);
-  }
 }
 
 void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t *pixels) {
@@ -394,6 +486,7 @@ void DrawDot(const PpuState& state) {
   int x_pos = state.registers.x_pos;
   if (x_pos >= 160) {
     state.registers.bg_step = 0;
+    state.registers.obj_step = 0;
     return;
   }
   if (!state.registers.is_in_window && IsInWindow(state)) {
@@ -406,9 +499,14 @@ void DrawDot(const PpuState& state) {
       SetBgTileLowHigh(state);
     }
   }
+  if (state.registers.obj_step == 0) {
+    SetObjTileLowHigh(state);
+  }
   PushPixel(state);
   ++state.registers.bg_step;
+  ++state.registers.obj_step;
   state.registers.bg_step %= 8;
+  state.registers.obj_step %= 8;
   ++state.registers.x_pos;
 }
 

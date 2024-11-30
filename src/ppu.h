@@ -151,6 +151,7 @@ struct Registers {
   int current_dot;
   int x_pos;
   int bg_step;
+  int obj_step;
 
   /* FIFO data */
   Palette background_pallete;
@@ -160,6 +161,7 @@ struct Registers {
   BgWindowAttributes bg_attrs;
   uint8_t obj_low;
   uint8_t obj_high;
+  SpriteAttributes obj_attrs;
 
 
   /* Palette Registers */

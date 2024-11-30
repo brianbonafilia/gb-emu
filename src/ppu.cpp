@@ -62,7 +62,7 @@ void IncrementPosition() {
     registers.is_in_window = false;
     ++registers.LY;
     if (registers.LY == 144) {
-      DrawOam(state);
+//      DrawOam(state);
     }
     if (registers.LY == 154) {
       if (registers.ppu_enable) GUI::UpdateTexture(pixels);
@@ -233,7 +233,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
-      assert(false);
+//      assert(false);
     case 0xFF4F:
       if (m == CPU::write) {
         registers.attr_bank = val & 1;
@@ -268,7 +268,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.bg_cram[registers.obj_color_addr];
     case 0xFF70:
-      assert(false);
+//      assert(false);
     default:
       return 0x00;
   }
