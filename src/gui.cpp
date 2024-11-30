@@ -37,7 +37,7 @@ CPU::Joypad actions{.joypad_input = 0xFF};
 CPU::Joypad direction{.joypad_input = 0xFF};
 
 // May make this more accurate i guess later, probably does not matter. Currently 60FPS.
-constexpr uint32_t kFrameTimeInMs = 16;
+constexpr uint32_t kFrameTimeInMs = 14;
 
 void UpdateTexture(uint32_t* pixels) {
   SDL_UpdateTexture(game_pixels, nullptr, pixels,kPixelWidth * sizeof(uint32_t));

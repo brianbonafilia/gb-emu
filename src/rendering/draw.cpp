@@ -114,8 +114,11 @@ int ObjSz(const PpuState& state) {
 int FindObjOamIdx(const PpuState& state, int x, int y) {
   for (int i = 0; i < 0xA0; i+=4) {
     int row = state.oam[i];
+    if (!state.registers.obj_sz) {
+      row -= 8;
+    }
     int col = state.oam[i + 1];
-    int row_low = row - ObjSz(state);
+    int row_low = state.oam[i] - 16;
     int col_low = col - 8;
     if (y >= row_low && y < row && x >= col_low && x < col) {
       return i;
@@ -132,7 +135,7 @@ void SetObjTileLowHigh(const PpuState& state) {
     state.registers.obj_step = -1;
     return;
   }
-  int row = state.oam[oam_index] - ObjSz(state);
+  int row = state.oam[oam_index] - 16;
   int col = state.oam[oam_index + 1] - 8;
   uint8_t tile_idx = state.oam[oam_index + 2];
   SpriteAttributes attributes{.attr = state.oam[oam_index + 3]};
