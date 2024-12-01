@@ -115,6 +115,8 @@ struct Registers {
     uint8_t IF;
   };
 
+  uint8_t wram_bank = 1;
+
   bool halt;
   bool IME;
 

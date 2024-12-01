@@ -55,17 +55,20 @@ void SetWindowTileLowHigh(const PpuState& state) {
   int x_tile = window_x / 8;
   int y_tile = window_y / 8;
   int tile_idx = state.vram[GetWindowOffset(state.registers) + x_tile + y_tile * 32];
+  SetWindowColorAttrs(state, x_tile, y_tile);
   int tile_addr = GetTileAddr(state, tile_idx);
   int tile_row = window_y % 8;
+  uint8_t* bank = state.vram;
+  if (state.registers.bg_attrs.bank == 1) {
+    bank = state.vram_bank1;
+  }
   state.registers.bg_step = window_x % 8;
-  state.registers.bg_low = state.vram[tile_addr + tile_row * 2];
-  state.registers.bg_high = state.vram[tile_addr + tile_row * 2 + 1];
-  SetWindowColorAttrs(state, x_tile, y_tile);
+  state.registers.bg_low = bank[tile_addr + tile_row * 2];
+  state.registers.bg_high = bank[tile_addr + tile_row * 2 + 1];
 }
 
 
 ColorPalette GetColorPalette(const PpuState& state, SpriteAttributes attributes) {
-  assert(attributes.bank == 0);
   ColorPalette color_palette {};
   Color color {};
   for (int i = 0; i < 4; ++i) {
@@ -147,8 +150,12 @@ void SetObjTileLowHigh(const PpuState& state) {
 
   state.registers.obj_step = (x - col);
   assert(state.registers.obj_step >= 0 && state.registers.obj_step < 8);
-  state.registers.obj_low = state.vram[sprite_addr + tile_row * 2];
-  state.registers.obj_high = state.vram[sprite_addr + tile_row * 2 + 1];
+  uint8_t* bank = state.vram;
+  if (attributes.bank == 1) {
+    bank = state.vram_bank1;
+  }
+  state.registers.obj_low = bank[sprite_addr + tile_row * 2];
+  state.registers.obj_high = bank[sprite_addr + tile_row * 2 + 1];
   state.registers.obj_attrs = attributes;
 
 }
@@ -164,14 +171,17 @@ void SetBgTileLowHigh(const PpuState& state) {
   int tile_idx = state.vram[GetBgOffset(state.registers) + x_tile + y_tile * 32];
   int tile_addr = GetTileAddr(state, tile_idx);
   int tile_row = bg_y_pos % 8;
-  state.registers.bg_step = bg_x_pos % 8;
-  state.registers.bg_low = state.vram[tile_addr + tile_row * 2];
-  state.registers.bg_high = state.vram[tile_addr + tile_row * 2 + 1];
   SetBgColorAttrs(state, x_tile, y_tile);
+  uint8_t* bank = state.vram;
+  if (state.registers.bg_attrs.bank == 1) {
+    bank = state.vram_bank1;
+  }
+  state.registers.bg_step = bg_x_pos % 8;
+  state.registers.bg_low = bank[tile_addr + tile_row * 2];
+  state.registers.bg_high = bank[tile_addr + tile_row * 2 + 1];
 }
 
 ColorPalette GetColorPalette(const PpuState& state, BgWindowAttributes attributes) {
-  assert(attributes.bank == 0);
   ColorPalette color_palette {};
   Color color {};
   for (int i = 0; i < 4; ++i) {
@@ -270,6 +280,9 @@ void PushObjPixel(int pixel, int color_idx, const PpuState& state) {
 void PushPixel(const PpuState &state) {
   int bg_step = state.registers.bg_step;
   uint8_t bg_mask = 0x80 >> bg_step;
+  if (state.registers.bg_attrs.flip_x) {
+    bg_mask = 0x1 << bg_step;
+  }
   int color_idx = 0;
   if (bg_mask & state.registers.bg_low) color_idx++;
   if (bg_mask & state.registers.bg_high) color_idx += 2;

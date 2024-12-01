@@ -196,9 +196,13 @@ struct Registers {
     uint8_t OBP1;
   };
 
-  /* GBC related registers */
+  /* CGB related registers */
   bool attr_bank = false;
   bool cgb_mode = false;
+
+  uint16_t vram_dma_source;
+  uint16_t vram_dma_dest;
+
 
   // Background color palette specification or background palette index
   union {

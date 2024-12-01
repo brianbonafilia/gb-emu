@@ -239,6 +239,9 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
         registers.attr_bank = val & 1;
       }
       return registers.attr_bank;
+    case 0xFF50 ... 0xFF55:
+      printf("ah i bet this is related %X, addr", addr);
+      return 0;
     case 0xFF68:
       if (m == CPU::write) {
         registers.bcps = val;
@@ -267,8 +270,6 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
         return val;
       }
       return registers.bg_cram[registers.obj_color_addr];
-    case 0xFF70:
-//      assert(false);
     default:
       return 0x00;
   }

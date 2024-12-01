@@ -22,7 +22,7 @@ Registers registers;
 uint8_t **reg_ind = new uint8_t *[7];
 uint16_t **reg_16ind = new uint16_t *[4];
 // start with 8KiB, will have to update to support GBC banking later
-uint8_t *wram = new uint8_t[0x2000];
+uint8_t *wram = new uint8_t[0x8000];
 uint8_t *hram = new uint8_t[0x7E];
 uint8_t *serial_port = new uint8_t[0x2];
 
@@ -67,11 +67,12 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return wram[addr - 0xC000];
     case 0xD000 ... 0xDFFF:
-      // WRAM which is banked for GBC
+      addr = addr - 0xD000 + (registers.wram_bank * 0x1000);
+      assert(addr < 0x8000);
       if (m == write) {
-        wram[addr - 0xC000] = val;
+        wram[addr] = val;
       }
-      return wram[addr - 0xC000];
+      return wram[addr];
     case 0xE000 ... 0xFDFF:
       printf("testing?\n");
       // Not supposed to go here
@@ -134,7 +135,17 @@ uint8_t access(uint16_t addr, uint8_t val) {
         registers.IF = val;
       }
       return registers.IF;
-    case 0xFF10 ... 0xFF7F:
+    case 0xFF10 ... 0xFF6F:
+      return PPU::access_registers(m, addr, val);
+    case 0xFF70:
+      if (m == write) {
+        registers.wram_bank = val & 0x7;
+        if (registers.wram_bank == 0) {
+          registers.wram_bank = 1;
+        }
+      }
+      return registers.wram_bank;
+    case 0xFF71 ... 0xFF7F:
       return PPU::access_registers(m, addr, val);
     case 0xFF80 ... 0xFFFE:
       // High RAM
