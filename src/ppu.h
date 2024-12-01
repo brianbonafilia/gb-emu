@@ -202,6 +202,13 @@ struct Registers {
 
   uint16_t vram_dma_source;
   uint16_t vram_dma_dest;
+  union {
+    struct {
+      uint8_t dma_length : 7;
+      bool hdma_transfer : 1;
+    };
+    uint8_t  dma_status;
+  };
 
 
   // Background color palette specification or background palette index

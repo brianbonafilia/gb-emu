@@ -43,6 +43,46 @@ void SetStatInterrupt() {
   CPU::access<CPU::write>(0xFF0F, IF);
 }
 
+void HdmaTransfer() {
+  registers.vram_dma_dest &= 0x1FFF;
+  assert(registers.vram_dma_dest <= 0x1FF0);
+  assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
+  registers.dma_length--;
+  for (int i = 0; i < 0x10; ++i) {
+    int vram_idx = registers.vram_dma_dest + i;
+    int source_idx = registers.vram_dma_source + i;
+    if (registers.attr_bank) {
+      vram_bank1[vram_idx] = CPU::access<CPU::read>(source_idx);
+    } else {
+      vram[vram_idx] = CPU::access<CPU::read>(source_idx);
+    }
+  }
+  registers.vram_dma_dest += 0x10;
+  registers.vram_dma_source += 0x10;
+  if (registers.dma_length == 0) {
+    registers.dma_status = 0;
+  }
+}
+
+void VramDmaTransfer(int length) {
+  registers.vram_dma_dest |= 0x8000;
+  printf("dest %X, source %X for length %X bank is %X dma status is %X\n",
+         registers.vram_dma_dest, registers.vram_dma_source, length, registers.attr_bank, registers.dma_status);
+  assert(registers.vram_dma_dest >= 0x8000 && registers.vram_dma_dest <= 0x9FF0);
+  assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
+  for (int i = 0; i < length; i++) {
+    assert(registers.vram_dma_dest + i < 0xA000);
+    int vram_idx = registers.vram_dma_dest + i - 0x8000;
+    int source_idx = registers.vram_dma_source + i;
+    if (registers.attr_bank) {
+      vram_bank1[vram_idx] = CPU::access<CPU::read>(source_idx);
+    } else {
+      vram[vram_idx] = CPU::access<CPU::read>(source_idx);
+    }
+  }
+  registers.dma_status = 0;
+}
+
 void DmaTransfer(uint8_t idx) {
   for (int i = 0; i < 0xA0; ++i) {
     oam[i] = CPU::access<CPU::read>((idx << 8) | i);
@@ -66,6 +106,7 @@ void IncrementPosition() {
     }
     if (registers.LY == 154) {
       if (registers.ppu_enable) GUI::UpdateTexture(pixels);
+      DrawDebugScreen(state);
       registers.LY = 0;
       registers.ly_eq = false;
     }
@@ -138,6 +179,9 @@ void Step() {
     registers.mode = new_mode;
     if (new_mode == vblank) {
       SetVblankInterrupt();
+    } else if (new_mode == hblank && registers.hdma_transfer) {
+      // transfer 0x10 bytes as part of transfer.
+      HdmaTransfer();
     }
   }
   switch (registers.mode) {
@@ -233,15 +277,54 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
+      assert((val & 1) == 0);
 //      assert(false);
     case 0xFF4F:
       if (m == CPU::write) {
         registers.attr_bank = val & 1;
       }
       return registers.attr_bank;
-    case 0xFF50 ... 0xFF55:
-      printf("ah i bet this is related %X, addr", addr);
+    case 0xFF51:
+      if (m == CPU::write) {
+        registers.vram_dma_source &= 0x00FF;
+        registers.vram_dma_source |= val << 8;
+      }
+      printf("writing to $FF51 val %X\n", val);
       return 0;
+    case 0xFF52:
+      if (m == CPU::write) {
+        val &= 0xF0;
+        registers.vram_dma_source &= 0xFF00;
+        registers.vram_dma_source |= val;
+      }
+      printf("writing to $FF52 val %X\n", val);
+      return 0;
+    case 0xFF53:
+      if (m == CPU::write) {
+        registers.vram_dma_dest &= 0x00FF;
+        registers.vram_dma_dest |= val << 8;
+      }
+      printf("writing to $FF53 val %X\n", val);
+      return 0;
+    case 0xFF54:
+      if (m == CPU::write) {
+        val &= 0xF0;
+        registers.vram_dma_dest &= 0xFF00;
+        registers.vram_dma_dest |= val;
+      }
+      printf("writing to $FF54 val %X\n", val);
+      return 0;
+    case 0xFF55:
+      if (m == CPU::read) {
+      } else {
+        registers.dma_status = val;
+        printf("val is %X,\n", val);
+        int length = ((val & 0x74) + 1) * 0x10;
+        if (!registers.hdma_transfer) {
+          VramDmaTransfer(length);
+        }
+      }
+      return registers.dma_status;
     case 0xFF68:
       if (m == CPU::write) {
         registers.bcps = val;

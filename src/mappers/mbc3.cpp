@@ -43,10 +43,8 @@ uint8_t MBC3::write(uint16_t addr, uint8_t val) {
       }
       break;
     case 0x4000 ... 0x5FFF:
-      printf("this would shed light?, val %X\n", val);
       rom_low_bank_index = val;
     case 0x6000 ... 0x7FFF:
-      printf("this would be helpful %X\n", val);
       advanced_banking = val & 1;
       break;
     case 0xA000 ... 0xBFFF: {

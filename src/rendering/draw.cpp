@@ -452,7 +452,7 @@ void DrawOam(const PpuState& state) {
   }
 }
 
-void DrawDebugTile(const PpuState& state, int tileAddr, int x, int y, uint32_t *pixels) {
+void DrawDebugTile(const PpuState& state, int tileAddr, int x, int y, uint32_t *pixels, uint8_t* bank) {
   for (int row = 0; row < 8; ++row) {
     uint8_t left_byte = state.vram[tileAddr + row * 2];
     uint8_t right_byte = state.vram[tileAddr + row * 2 + 1];
@@ -490,8 +490,13 @@ void DrawDebugScreen(const PpuState& state) {
   for (int row = 0; row < 64; ++row) {
     for (int col = 0; col < 32; ++col) {
       uint8_t tile_idx = state.vram[0x1800 + (row * 32) + col];
-      int vram_location = GetTileAddr(state, tile_idx);
-      DrawDebugTile(state, vram_location, col * 8, row * 8, pixels);
+      uint8_t* bank = state.vram;
+      int vram_location = (row * 32 + col) * 16;
+      if (vram_location > 0x1800) {
+        bank = state.vram_bank1;
+        vram_location -= 1800;
+      }
+      DrawDebugTile(state, vram_location, col * 8, row * 8, pixels, bank);
     }
   }
   GUI::DrawDebugScreen(pixels);

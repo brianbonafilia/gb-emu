@@ -47,10 +47,8 @@ uint8_t MBC1::write(uint16_t addr, uint8_t val) {
 //      printf("Switching bank index to %X\n", rom_bank_index_);
       break;
     case 0x4000 ... 0x5FFF:
-      printf("this would shed light?, val %X\n", val);
       rom_low_bank_index = val & rom_mask_;
     case 0x6000 ... 0x7FFF:
-      printf("this would be helpful %X\n", val);
       advanced_banking = val & 1;
       break;
     case 0xA000 ... 0xBFFF:

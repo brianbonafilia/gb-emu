@@ -67,7 +67,10 @@ uint8_t access(uint16_t addr, uint8_t val) {
       }
       return wram[addr - 0xC000];
     case 0xD000 ... 0xDFFF:
-      addr = addr - 0xD000 + (registers.wram_bank * 0x1000);
+      addr = addr - 0xD000 + ((registers.wram_bank & 0x7) * 0x1000);
+      if (registers.wram_bank == 0) {
+        addr += 0x1000;
+      }
       assert(addr < 0x8000);
       if (m == write) {
         wram[addr] = val;
@@ -139,9 +142,9 @@ uint8_t access(uint16_t addr, uint8_t val) {
       return PPU::access_registers(m, addr, val);
     case 0xFF70:
       if (m == write) {
-        registers.wram_bank = val & 0x7;
-        if (registers.wram_bank == 0) {
-          registers.wram_bank = 1;
+        registers.wram_bank = val;
+        if (debug) {
+          printf("writing to wram val %X\n", val);
         }
       }
       return registers.wram_bank;
