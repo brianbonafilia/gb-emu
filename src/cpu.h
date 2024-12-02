@@ -147,6 +147,8 @@ void ProcessInstruction(bool debug = false);
 
 void Tick();
 
+bool Halted();
+
 // approximation of running about a frame worth of cycles.
 void RunFrame(bool debug);
 

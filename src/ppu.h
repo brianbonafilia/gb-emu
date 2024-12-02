@@ -202,6 +202,7 @@ struct Registers {
 
   uint16_t vram_dma_source;
   uint16_t vram_dma_dest;
+  bool hdma_started;
   union {
     struct {
       uint8_t dma_length : 7;

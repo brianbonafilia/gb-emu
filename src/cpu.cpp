@@ -1152,5 +1152,9 @@ void ProcessInstruction(bool debug) {
   }
 }
 
+bool Halted() {
+  return registers.halt;
+}
+
 }  //  namespace CPU
 

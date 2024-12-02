@@ -44,6 +44,9 @@ void SetStatInterrupt() {
 }
 
 void HdmaTransfer() {
+  if (CPU::Halted()) {
+    return;
+  }
   registers.vram_dma_dest &= 0x1FFF;
   assert(registers.vram_dma_dest <= 0x1FF0);
   assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
@@ -65,14 +68,14 @@ void HdmaTransfer() {
 }
 
 void VramDmaTransfer(int length) {
-  registers.vram_dma_dest |= 0x8000;
+  registers.vram_dma_dest &= 0x1FFF;
   printf("dest %X, source %X for length %X bank is %X dma status is %X\n",
          registers.vram_dma_dest, registers.vram_dma_source, length, registers.attr_bank, registers.dma_status);
-  assert(registers.vram_dma_dest >= 0x8000 && registers.vram_dma_dest <= 0x9FF0);
+  assert(registers.vram_dma_dest <= 0x9FF0);
   assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
   for (int i = 0; i < length; i++) {
     assert(registers.vram_dma_dest + i < 0xA000);
-    int vram_idx = registers.vram_dma_dest + i - 0x8000;
+    int vram_idx = registers.vram_dma_dest + i;
     int source_idx = registers.vram_dma_source + i;
     if (registers.attr_bank) {
       vram_bank1[vram_idx] = CPU::access<CPU::read>(source_idx);
@@ -277,7 +280,8 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
-      assert((val & 1) == 0);
+      return 0;
+      //assert((val & 1) == 0);
 //      assert(false);
     case 0xFF4F:
       if (m == CPU::write) {
@@ -316,12 +320,20 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       return 0;
     case 0xFF55:
       if (m == CPU::read) {
+        if (registers.dma_status == 0) {
+          return 0xFF;
+        }
       } else {
+        if (registers.hdma_started && (val & 0x80) == 0) {
+          registers.hdma_started = false;
+          return 0;
+        }
         registers.dma_status = val;
-        printf("val is %X,\n", val);
         int length = ((val & 0x74) + 1) * 0x10;
         if (!registers.hdma_transfer) {
           VramDmaTransfer(length);
+        } else {
+          registers.hdma_started = true;
         }
       }
       return registers.dma_status;
