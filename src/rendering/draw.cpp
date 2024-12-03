@@ -301,7 +301,7 @@ void PushPixel(const PpuState &state) {
   int pixel = state.registers.x_pos + state.registers.LY * 160;
   if (obj_color_idx == 0)  {
     PushBgPixel(pixel, color_idx, state);
-  } else if (color_idx > 0 && state.registers.obj_attrs.priority) {
+  } else if (color_idx > 0 && (state.registers.obj_attrs.priority || state.registers.bg_attrs.priority)) {
     PushBgPixel(pixel, color_idx, state);
   } else {
     PushObjPixel(pixel, obj_color_idx, state);
