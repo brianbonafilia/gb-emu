@@ -104,9 +104,6 @@ void IncrementPosition() {
     registers.x_pos = 0;
     registers.is_in_window = false;
     ++registers.LY;
-    if (registers.LY == 144) {
-//      DrawOam(state);
-    }
     if (registers.LY == 154) {
       if (registers.ppu_enable) GUI::UpdateTexture(pixels);
       DrawDebugScreen(state);
@@ -150,12 +147,12 @@ PpuMode GetMode() {
   if (registers.LY > 143) {
     return PpuMode::vblank;
   }
-  if (current_dot < 80) {
+  if (current_dot <= 80) {
     return PpuMode::oam_scan;
   }
   // TODO: at some point, for games which require accurate timeing we will
   // need to consider adding OBJ penalties. And making this mode variable.
-  if (current_dot > 80  && current_dot < 252) {
+  if (current_dot < 252) {
     return PpuMode::draw;
   }
   return PpuMode::hblank;
@@ -209,8 +206,6 @@ void dot() {
 
 uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
   switch (addr) {
-    case 0xFF10 ... 0xFF3F:
-      return 0x00;
     case 0xFF40:
       if (m == CPU::write) {
         bool old_ppu = registers.ppu_enable;
@@ -280,6 +275,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
+      printf("accessing double speed with val %X mode %d\n", val, m);
       return 0;
       //assert((val & 1) == 0);
 //      assert(false);
