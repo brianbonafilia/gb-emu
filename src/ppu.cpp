@@ -181,7 +181,7 @@ void ScanOam() {
   }
   int oam_buffer_idx = 0;
 
-  for (int i = 0; i < 0xA0; i+=4) {
+  for (int i = 0; i < 0xA0 && oam_buffer_idx < 0x28; i+=4) {
     int row = state.oam[i];
     if (!state.registers.obj_sz) {
       row -= 8;
