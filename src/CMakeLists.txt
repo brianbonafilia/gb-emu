@@ -23,6 +23,8 @@ set(SOURCE_FILES main.cpp cpu cartridge.cpp cartridge.h alu.cpp
         debug/log.cpp
         mappers/mbc3.h
         mappers/mbc3.cpp
+        apu.h
+        apu.cpp
 )
 
 set(EXECUTABLE_OUTPUT_PATH ..)
@@ -60,12 +62,13 @@ add_executable(
         debug/log.cpp
         mappers/mbc3.h
         mappers/mbc3.cpp
+        apu.cpp
 )
 
 add_executable(
         ppu_test debug/log.cpp rendering/draw.cpp gui.cpp cartridge.cpp mapper.cpp mappers/mbc1.cpp mappers/mbc3.cpp
         ppu.cpp cpu.cpp gui.cpp alu.cpp
-        ppu_test.cpp
+        ppu_test.cpp apu.cpp
 )
 
 add_executable(alu_test alu.cpp cpu.cpp
@@ -74,7 +77,8 @@ add_executable(alu_test alu.cpp cpu.cpp
         rendering/draw.cpp
         debug/log.cpp
         mappers/mbc3.h
-        mappers/mbc3.cpp)
+        mappers/mbc3.cpp
+        apu.cpp)
 
 target_link_libraries(
         gb_emu

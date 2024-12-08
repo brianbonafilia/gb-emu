@@ -5,6 +5,7 @@
 #include <iostream>
 #include <functional>
 #include <cassert>
+#include "apu.h"
 #include "cpu.h"
 #include "alu.h"
 #include "ppu.h"
@@ -115,7 +116,7 @@ uint8_t access(uint16_t addr, uint8_t val) {
       if (m == write) {
         registers.DIV = 0;
       }
-      return registers.DIV;
+      return registers.DIV & 0xFF;
     case 0xFF05:
       if (m == write) {
         registers.TIMA = val;
@@ -138,7 +139,9 @@ uint8_t access(uint16_t addr, uint8_t val) {
         registers.IF = val;
       }
       return registers.IF;
-    case 0xFF10 ... 0xFF6F:
+    case 0xFF10 ... 0xFF3F:
+      return APU::access_registers(m, addr, val);
+    case 0xFF40 ... 0xFF6F:
       return PPU::access_registers(m, addr, val);
     case 0xFF70:
       if (m == write) {
@@ -205,35 +208,39 @@ void CheckTimer() {
 // TODO: evaluate running 4 M-cycles instead of one 4 cycle tick.
 void Tick() {
   PPU::dot(); PPU::dot(); PPU::dot(); PPU::dot();
-  registers.DIV++;
+  registers.time_counter++;
+  if (registers.time_counter % 64 == 0) {
+    registers.DIV++;
+  }
   if (registers.timer_enable) {
     switch (registers.clock_select) {
       case 0x0:
-        if (registers.DIV % 256 == 0) {
+        if (registers.time_counter % 256 == 0) {
           registers.TIMA++;
           CheckTimer();
         }
         break;
       case 0x1:
-        if (registers.DIV % 4 == 0) {
+        if (registers.time_counter % 4 == 0) {
           registers.TIMA++;
           CheckTimer();
         }
         break;
       case 0x2:
-        if (registers.DIV % 16 == 0) {
+        if (registers.time_counter % 16 == 0) {
           registers.TIMA++;
           CheckTimer();
         }
         break;
       case 0x3:
-        if (registers.DIV % 64 == 0) {
+        if (registers.time_counter % 64 == 0) {
           registers.TIMA++;
           CheckTimer();
         }
         break;
     }
   }
+
   if (serial_interrupt_counter > 0) {
     --serial_interrupt_counter;
     if (serial_interrupt_counter == 0) {

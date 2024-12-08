@@ -111,7 +111,7 @@ void PushObjColorPixel(int pixel, int val, ColorPalette color_palette, uint32_t 
 }
 
 int ObjSz(const PpuState& state) {
-  return state.registers.obj_sz ? 16 : 8;
+  return state.registers.obj_sz ? 15 : 7;
 }
 
 int FindObjOamIdx(const PpuState& state, int x, int y) {

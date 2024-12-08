@@ -246,6 +246,7 @@ struct PpuState {
   uint8_t* vram;
   uint8_t* vram_bank1;
   uint8_t* oam;
+  uint8_t* oam_buffer;
   uint32_t* pixels;
 };
 

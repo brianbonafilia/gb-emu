@@ -74,6 +74,7 @@ struct Registers {
   // Program Counter
   uint16_t PC;
 
+  uint64_t time_counter = 0;
   // Divider register,
   uint16_t DIV;
   // Timer counter
