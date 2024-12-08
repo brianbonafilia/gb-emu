@@ -14,6 +14,7 @@ namespace PPU {
 namespace {
 uint8_t *vram = new uint8_t[0x2000];
 uint8_t *vram_bank1 = new uint8_t[0x2000];
+uint8_t *oam_buffer = new uint8_t[0x28];
 uint8_t *oam = new uint8_t[0xA0];
 uint32_t *pixels = new uint32_t[144 * 156];
 
@@ -26,6 +27,7 @@ PpuState state {
     .vram = vram,
     .vram_bank1 = vram_bank1,
     .oam = oam,
+    .oam_buffer = oam_buffer,
     .pixels = pixels,
 };
 
@@ -102,12 +104,16 @@ void IncrementPosition() {
   if (current_dot == 456) {
     current_dot = 0;
     registers.x_pos = 0;
+    if (registers.is_in_window) {
+      registers.WLY++;
+    }
     registers.is_in_window = false;
     ++registers.LY;
     if (registers.LY == 154) {
       if (registers.ppu_enable) GUI::UpdateTexture(pixels);
       DrawDebugScreen(state);
       registers.LY = 0;
+      registers.WLY = 0;
       registers.ly_eq = false;
     }
     if (registers.LY == registers.LYC) {
@@ -168,6 +174,28 @@ void SetInterruptIfNeeded(PpuMode mode) {
   }
 }
 
+void ScanOam() {
+  // clear old buffer
+  for (int i = 0; i < 0x28; ++i) {
+    oam_buffer[i] = 0;
+  }
+  int oam_buffer_idx = 0;
+
+  for (int i = 0; i < 0xA0; i+=4) {
+    int row = state.oam[i];
+    if (!state.registers.obj_sz) {
+      row -= 8;
+    }
+    int row_low = state.oam[i] - 16;
+    if (registers.LY >= row_low && registers.LY < row) {
+      oam_buffer[oam_buffer_idx++] = state.oam[i];
+      oam_buffer[oam_buffer_idx++] = state.oam[i + 1];
+      oam_buffer[oam_buffer_idx++] = state.oam[i + 2];
+      oam_buffer[oam_buffer_idx++] = state.oam[i + 3];
+    }
+  }
+}
+
 void Step() {
   if (!registers.ppu_enable) {
     return;
@@ -182,6 +210,8 @@ void Step() {
     } else if (new_mode == hblank && registers.hdma_transfer) {
       // transfer 0x10 bytes as part of transfer.
       HdmaTransfer();
+    } else if (new_mode == oam_scan) {
+      ScanOam();
     }
   }
   switch (registers.mode) {
@@ -213,6 +243,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
         if (!registers.ppu_enable) {
           printf("turning off ppu %X\n", registers.LCDC);
           registers.LY = 0;
+          registers.WLY = 0;
           registers.current_dot = 0;
           registers.mode = hblank;
         } else if (!old_ppu) {

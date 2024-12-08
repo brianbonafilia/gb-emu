@@ -37,6 +37,14 @@ union SpriteAttributes {
   uint8_t attr;
 };
 
+struct ObjTileData {
+  uint8_t obj_step;
+  uint8_t obj_pos;
+  uint8_t obj_low;
+  uint8_t obj_high;
+  SpriteAttributes obj_attrs;
+};
+
 union BgWindowAttributes {
   struct {
     // CGB select palette
@@ -145,6 +153,8 @@ struct Registers {
   /* Window Scroll */
   uint8_t WX;
   uint8_t WY;
+  // internal window line counter.
+  uint8_t WLY;
 
   /* Internal PPU registers */
   bool is_in_window;

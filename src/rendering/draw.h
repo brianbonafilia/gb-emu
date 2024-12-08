@@ -12,8 +12,6 @@ namespace PPU {
 
 int GetTileAddr(const PpuState& state,  int tile_idx);
 
-int GetSpriteAddr(int tile_idx);
-
 void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t* pixels);
 
 void DrawBackground(const PpuState& state, uint32_t* pixels);

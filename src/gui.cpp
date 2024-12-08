@@ -184,8 +184,6 @@ void Init(bool debug) {
     uint32_t latency = SDL_GetTicks() - startTime;
     if (latency < kFrameTimeInMs) {
       SDL_Delay(kFrameTimeInMs - latency);
-    } else {
-//      printf("not hitting desired frame rate\n");
     }
   }
 

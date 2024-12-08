@@ -27,11 +27,18 @@ int GetWindowOffset(const Registers& registers) {
   return registers.window_tile_map ? 0x1C00 : 0x1800;
 }
 
+int GetSpriteAddr(const PpuState& state, int tile_idx) {
+  if (state.registers.obj_sz) {
+    tile_idx &= 0xFE;
+  }
+    return tile_idx * 16;
+}
+
 bool IsInWindow(const PpuState& state) {
   if (!state.registers.window_enable) {
     return false;
   }
-  if (state.registers.x_pos < state.registers.WX - 8) {
+  if (state.registers.x_pos < state.registers.WX - 7) {
     return false;
   }
   return state.registers.LY >= state.registers.WY;
@@ -50,14 +57,18 @@ void SetBgColorAttrs(const PpuState& state, int x_tile, int y_tile) {
 }
 
 void SetWindowTileLowHigh(const PpuState& state) {
-  int window_x = state.registers.x_pos + 8 - state.registers.WX;
-  int window_y = state.registers.LY - state.registers.WY;
+  int window_x = state.registers.x_pos + 7 - state.registers.WX;
+  int window_y = state.registers.WLY;
   int x_tile = window_x / 8;
   int y_tile = window_y / 8;
   int tile_idx = state.vram[GetWindowOffset(state.registers) + x_tile + y_tile * 32];
   SetWindowColorAttrs(state, x_tile, y_tile);
   int tile_addr = GetTileAddr(state, tile_idx);
   int tile_row = window_y % 8;
+
+  if (state.registers.cgb_mode && state.registers.bg_attrs.flip_y) {
+    tile_row = 7 - tile_row;
+  }
   uint8_t* bank = state.vram;
   if (state.registers.bg_attrs.bank == 1) {
     bank = state.vram_bank1;
@@ -114,17 +125,73 @@ int ObjSz(const PpuState& state) {
   return state.registers.obj_sz ? 15 : 7;
 }
 
+int GetObjColor(const ObjTileData data) {
+  int obj_color_idx = 0;
+  if (data.obj_step >= 0) {
+    uint8_t obj_mask = 0x80 >> data.obj_step;
+    if (data.obj_attrs.flip_x) {
+      obj_mask = 0x01 << data.obj_step;
+    }
+    if (obj_mask & data.obj_low) obj_color_idx++;
+    if (obj_mask & data.obj_high) obj_color_idx += 2;
+  }
+  return obj_color_idx;
+}
+
+int GetObjColor(const PpuState &state) {
+  int obj_color_idx = 0;
+  if (state.registers.obj_step >= 0) {
+    uint8_t obj_mask = 0x80 >> state.registers.obj_step;
+    if (state.registers.obj_attrs.flip_x) {
+      obj_mask = 0x01 << state.registers.obj_step;
+    }
+    if (obj_mask & state.registers.obj_low) obj_color_idx++;
+    if (obj_mask & state.registers.obj_high) obj_color_idx += 2;
+  }
+  return obj_color_idx;
+}
+
+ObjTileData GetObjData(const PpuState& state, int x, int y, int oam_index) {
+  ObjTileData data{};
+  int row = state.oam_buffer[oam_index] - 16;
+  int col = state.oam_buffer[oam_index + 1] - 8;
+  uint8_t tile_idx = state.oam_buffer[oam_index + 2];
+  SpriteAttributes attributes{.attr = state.oam_buffer[oam_index + 3]};
+  int sprite_addr = GetSpriteAddr(state, tile_idx);
+  int tile_row = y - row;
+  if (attributes.flip_y) {
+    tile_row = ObjSz(state) - tile_row;
+  }
+
+  data.obj_step = (x - col);
+  assert(data.obj_step >= 0 && data.obj_step < 8);
+  uint8_t* bank = state.vram;
+  if (attributes.bank == 1) {
+    bank = state.vram_bank1;
+  }
+  data.obj_pos = oam_index;
+  data.obj_low = bank[sprite_addr + tile_row * 2];
+  data.obj_high = bank[sprite_addr + tile_row * 2 + 1];
+  data.obj_attrs = attributes;
+  return data;
+}
+
 int FindObjOamIdx(const PpuState& state, int x, int y) {
-  for (int i = 0; i < 0xA0; i+=4) {
-    int row = state.oam[i];
+  for (int i = 0; i < 0x28; i+=4) {
+    int row = state.oam_buffer[i];
+    if (row == 0) {
+      return -1;
+    }
     if (!state.registers.obj_sz) {
       row -= 8;
     }
-    int col = state.oam[i + 1];
-    int row_low = state.oam[i] - 16;
+    int col = state.oam_buffer[i + 1];
     int col_low = col - 8;
-    if (y >= row_low && y < row && x >= col_low && x < col) {
-      return i;
+    if (x >= col_low && x < col) {
+      ObjTileData data = GetObjData(state, x, y, i);
+      if (GetObjColor(data) > 0) {
+        return i;
+      }
     }
   }
   return -1;
@@ -138,11 +205,11 @@ void SetObjTileLowHigh(const PpuState& state) {
     state.registers.obj_step = -1;
     return;
   }
-  int row = state.oam[oam_index] - 16;
-  int col = state.oam[oam_index + 1] - 8;
-  uint8_t tile_idx = state.oam[oam_index + 2];
-  SpriteAttributes attributes{.attr = state.oam[oam_index + 3]};
-  int sprite_addr = GetSpriteAddr(tile_idx);
+  int row = state.oam_buffer[oam_index] - 16;
+  int col = state.oam_buffer[oam_index + 1] - 8;
+  uint8_t tile_idx = state.oam_buffer[oam_index + 2];
+  SpriteAttributes attributes{.attr = state.oam_buffer[oam_index + 3]};
+  int sprite_addr = GetSpriteAddr(state, tile_idx);
   int tile_row = y - row;
   if (attributes.flip_y) {
     tile_row = ObjSz(state) - tile_row;
@@ -172,6 +239,11 @@ void SetBgTileLowHigh(const PpuState& state) {
   int tile_addr = GetTileAddr(state, tile_idx);
   int tile_row = bg_y_pos % 8;
   SetBgColorAttrs(state, x_tile, y_tile);
+
+  if (state.registers.cgb_mode && state.registers.bg_attrs.flip_y) {
+    tile_row = 7 - tile_row;
+  }
+
   uint8_t* bank = state.vram;
   if (state.registers.bg_attrs.bank == 1) {
     bank = state.vram_bank1;
@@ -287,20 +359,22 @@ void PushPixel(const PpuState &state) {
   if (bg_mask & state.registers.bg_low) color_idx++;
   if (bg_mask & state.registers.bg_high) color_idx += 2;
 
+  if (!state.registers.cgb_mode && !state.registers.bgw_ef) {
+    color_idx = 0;
+  }
 
-  int obj_color_idx = 0;
-  if (state.registers.obj_step >= 0) {
-    uint8_t obj_mask = 0x80 >> state.registers.obj_step;
-    if (state.registers.obj_attrs.flip_x) {
-      obj_mask = 0x01 << state.registers.obj_step;
-    }
-    if (obj_mask & state.registers.obj_low) obj_color_idx++;
-    if (obj_mask & state.registers.obj_high) obj_color_idx += 2;
+  int obj_color_idx = GetObjColor(state);
+
+  if (!state.registers.obj_ef) {
+    obj_color_idx = 0;
   }
 
   int pixel = state.registers.x_pos + state.registers.LY * 160;
-  if (obj_color_idx == 0)  {
+  if (obj_color_idx == 0) {
     PushBgPixel(pixel, color_idx, state);
+  } else if (state.registers.cgb_mode && !state.registers.bgw_ef) {
+    // for CGB mode if background window is not enabled, obj always gets priority.
+    PushObjPixel(pixel, obj_color_idx, state);
   } else if (color_idx > 0 && (state.registers.obj_attrs.priority || state.registers.bg_attrs.priority)) {
     PushBgPixel(pixel, color_idx, state);
   } else {
@@ -354,10 +428,6 @@ int GetTileAddr(const PpuState& state, int tile_idx) {
     auto val = (int8_t) tile_idx;
     return 0x1000 + val * 16;
   }
-}
-
-int GetSpriteAddr(int tile_idx) {
-  return tile_idx * 16;
 }
 
 void DrawSprite(const PpuState& state, int tile_addr, SpriteAttributes attributes, int row, int col, uint32_t *pixels) {
@@ -447,7 +517,7 @@ void DrawOam(const PpuState& state) {
     }
     uint8_t tile_idx = state.oam[i + 2];
     SpriteAttributes attributes{.attr = state.oam[i + 3]};
-    int sprite_addr = GetSpriteAddr(tile_idx);
+    int sprite_addr = GetSpriteAddr(state, tile_idx);
     DrawSprite(state, sprite_addr, attributes, row, col, state.pixels);
   }
 }
@@ -520,9 +590,7 @@ void DrawDot(const PpuState& state) {
       SetBgTileLowHigh(state);
     }
   }
-  if (state.registers.obj_step == 0) {
-    SetObjTileLowHigh(state);
-  }
+  SetObjTileLowHigh(state);
   PushPixel(state);
   ++state.registers.bg_step;
   ++state.registers.obj_step;
