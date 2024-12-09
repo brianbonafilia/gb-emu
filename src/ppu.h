@@ -210,6 +210,16 @@ struct Registers {
   bool attr_bank = false;
   bool cgb_mode = false;
 
+  union {
+    struct {
+      bool armed : 1;
+      uint8_t : 6;
+      bool double_mode : 1; // AKA current speed
+    };
+    // tracks double speed CPU mode;
+    uint8_t KEY1;
+  };
+
   uint16_t vram_dma_source;
   uint16_t vram_dma_dest;
   bool hdma_started;

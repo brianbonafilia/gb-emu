@@ -121,6 +121,8 @@ struct Registers {
   bool halt;
   bool IME;
 
+  bool double_speed_mode = false;
+
   Joypad controller{ .joypad_input = 0xF};
 };
 
@@ -152,6 +154,8 @@ bool Halted();
 
 // approximation of running about a frame worth of cycles.
 void RunFrame(bool debug);
+
+void SetDoubleSpeed(bool double_speed);
 
 }
 

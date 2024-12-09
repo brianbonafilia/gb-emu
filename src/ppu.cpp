@@ -306,10 +306,12 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
-      printf("accessing double speed with val %X mode %d\n", val, m);
-      return 0;
-      //assert((val & 1) == 0);
-//      assert(false);
+      printf("accessing double speed mode with val %X mode %d", val, m);
+      if (m == CPU::write && (val & 1)) {
+        registers.double_mode = ~registers.double_mode;
+        CPU::SetDoubleSpeed(registers.double_mode);
+      }
+      return registers.KEY1;
     case 0xFF4F:
       if (m == CPU::write) {
         registers.attr_bank = val & 1;
