@@ -98,6 +98,16 @@ uint32_t ExtendBits(uint32_t bits) {
   return (bits << 3) | (bits >> 2);
 }
 
+// at the end of each frame reset necessary state
+void ResetFrameState() {
+  registers.LY = 0;
+  registers.WLY = 0;
+  registers.ly_eq = false;
+  registers.wy_eq = false;
+  registers.wx_eq = false;
+}
+
+
 // Update the location of the current dot and line.
 void IncrementPosition() {
   ++current_dot;
@@ -110,11 +120,8 @@ void IncrementPosition() {
     registers.is_in_window = false;
     ++registers.LY;
     if (registers.LY == 154) {
-      if (registers.ppu_enable) GUI::UpdateTexture(pixels);
       DrawDebugScreen(state);
-      registers.LY = 0;
-      registers.WLY = 0;
-      registers.ly_eq = false;
+      ResetFrameState();
     }
     if (registers.LY == registers.LYC) {
       if (registers.lyc_stat) {
@@ -206,12 +213,18 @@ void Step() {
     SetInterruptIfNeeded(new_mode);
     registers.mode = new_mode;
     if (new_mode == vblank) {
+      if (registers.ppu_enable) GUI::UpdateTexture(pixels);
       SetVblankInterrupt();
     } else if (new_mode == hblank && registers.hdma_transfer) {
       // transfer 0x10 bytes as part of transfer.
       HdmaTransfer();
     } else if (new_mode == oam_scan) {
       ScanOam();
+      // in order for window to turn on in a frame at one point WY must be
+      // equal to LY, and this condition is only checked during OAM scan.
+      if (registers.WY == registers.LY) {
+        registers.wy_eq = true;
+      }
     }
   }
   switch (registers.mode) {
@@ -242,8 +255,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
         registers.LCDC = val;
         if (!registers.ppu_enable) {
           printf("turning off ppu %X\n", registers.LCDC);
-          registers.LY = 0;
-          registers.WLY = 0;
+          ResetFrameState();
           registers.current_dot = 0;
           registers.mode = hblank;
         } else if (!old_ppu) {
@@ -306,7 +318,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       }
       return registers.WX;
     case 0xFF4D:
-      printf("accessing double speed mode with val %X mode %d", val, m);
+      printf("accessing double speed mode with val %X mode %d\n", val, m);
       if (m == CPU::write && (val & 1)) {
         registers.double_mode = ~registers.double_mode;
         CPU::SetDoubleSpeed(registers.double_mode);
@@ -355,6 +367,7 @@ uint8_t access_registers(CPU::mode m, uint16_t addr, uint8_t val) {
       } else {
         if (registers.hdma_started && (val & 0x80) == 0) {
           registers.hdma_started = false;
+          registers.dma_status = 0;
           return 0;
         }
         registers.dma_status = val;

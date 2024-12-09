@@ -158,6 +158,8 @@ struct Registers {
 
   /* Internal PPU registers */
   bool is_in_window;
+  bool wy_eq;
+  bool wx_eq;
   int current_dot;
   int x_pos;
   int bg_step;
