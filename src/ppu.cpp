@@ -19,10 +19,10 @@ uint8_t *oam = new uint8_t[0xA0];
 uint32_t *pixels = new uint32_t[144 * 156];
 
 int current_dot = 0;
-Registers registers {.LCDC = 0x91};
+Registers registers{.LCDC = 0x91};
 bool debug = false;
 
-PpuState state {
+PpuState state{
     .registers = registers,
     .vram = vram,
     .vram_bank1 = vram_bank1,
@@ -51,7 +51,8 @@ void HdmaTransfer() {
   }
   registers.vram_dma_dest &= 0x1FFF;
   assert(registers.vram_dma_dest <= 0x1FF0);
-  assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
+  assert(registers.vram_dma_source < 0x7FF0
+             || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
   registers.dma_length--;
   for (int i = 0; i < 0x10; ++i) {
     int vram_idx = registers.vram_dma_dest + i;
@@ -74,7 +75,8 @@ void VramDmaTransfer(int length) {
   printf("dest %X, source %X for length %X bank is %X dma status is %X\n",
          registers.vram_dma_dest, registers.vram_dma_source, length, registers.attr_bank, registers.dma_status);
   assert(registers.vram_dma_dest <= 0x9FF0);
-  assert(registers.vram_dma_source < 0x7FF0 || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
+  assert(registers.vram_dma_source < 0x7FF0
+             || (registers.vram_dma_source >= 0xA000 && registers.vram_dma_source <= 0xDFF0));
   for (int i = 0; i < length; i++) {
     assert(registers.vram_dma_dest + i < 0xA000);
     int vram_idx = registers.vram_dma_dest + i;
@@ -106,7 +108,6 @@ void ResetFrameState() {
   registers.wy_eq = false;
   registers.wx_eq = false;
 }
-
 
 // Update the location of the current dot and line.
 void IncrementPosition() {
@@ -188,7 +189,7 @@ void ScanOam() {
   }
   int oam_buffer_idx = 0;
 
-  for (int i = 0; i < 0xA0 && oam_buffer_idx < 0x28; i+=4) {
+  for (int i = 0; i < 0xA0 && oam_buffer_idx < 0x28; i += 4) {
     int row = state.oam[i];
     if (!state.registers.obj_sz) {
       row -= 8;
@@ -240,7 +241,6 @@ void Step() {
       break;
   }
 }
-
 
 // execute one dot
 void dot() {
@@ -424,7 +424,6 @@ uint8_t read_oam(uint16_t addr) {
 void set_cgb_mode(bool cgb_mode) {
   registers.cgb_mode = cgb_mode;
 }
-
 
 uint32_t ToRgb888(Color c) {
   return (ExtendBits(c.red()) << 16) | (ExtendBits(c.green()) << 8) | ExtendBits(c.blue());

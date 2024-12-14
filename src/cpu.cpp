@@ -208,7 +208,8 @@ void CheckTimer() {
 
 // TODO: evaluate running 4 M-cycles instead of one 4 cycle tick.
 void Tick() {
-  PPU::dot(); PPU::dot();
+  PPU::dot();
+  PPU::dot();
   if (!registers.double_speed_mode) {
     PPU::dot();
     PPU::dot();

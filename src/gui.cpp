@@ -39,21 +39,21 @@ CPU::Joypad direction{.joypad_input = 0xFF};
 // May make this more accurate i guess later, probably does not matter. Currently 60FPS.
 constexpr uint32_t kFrameTimeInMs = 14;
 
-void UpdateTexture(uint32_t* pixels) {
-  SDL_UpdateTexture(game_pixels, nullptr, pixels,kPixelWidth * sizeof(uint32_t));
+void UpdateTexture(uint32_t *pixels) {
+  SDL_UpdateTexture(game_pixels, nullptr, pixels, kPixelWidth * sizeof(uint32_t));
   SDL_RenderClear(renderer);
   SDL_RenderCopy(renderer, game_pixels, nullptr, nullptr);
   SDL_RenderPresent(renderer);
 }
 
-void DrawDebugScreen(uint32_t* pixels) {
+void DrawDebugScreen(uint32_t *pixels) {
   SDL_UpdateTexture(debug_pixels, nullptr, pixels, kDPixelWidth * sizeof(uint32_t));
   SDL_RenderClear(debug_renderer);
   SDL_RenderCopy(debug_renderer, debug_pixels, nullptr, nullptr);
   SDL_RenderPresent(debug_renderer);
 }
 
-void SetControllerState(CPU::Joypad& controller) {
+void SetControllerState(CPU::Joypad &controller) {
   controller.buttons = 0xF;
   if ((controller.joypad_input & 0xF0) == 0x30) {
     controller.joypad_input = 0x3F;
@@ -152,32 +152,32 @@ void Init(bool debug) {
             debug = ~debug;
         }
       } else if (e.type == SDL_KEYUP) {
-          switch (e.key.keysym.sym) {
-            case SDLK_UP:
-              direction.select_or_up = true;
-              break;
-            case SDLK_DOWN:
-              direction.start_or_down = true;
-              break;
-            case SDLK_LEFT:
-              direction.b_or_left = true;
-              break;
-            case SDLK_RIGHT:
-              direction.a_or_right = true;
-              break;
-            case SDLK_SPACE:
-              actions.a_or_right = true;
-              break;
-            case SDLK_x:
-              actions.b_or_left = true;
-              break;
-            case SDLK_RETURN:
-              actions.start_or_down = true;
-              break;
-            case SDLK_c:
-              actions.select_or_up = true;
-              break;
-          }
+        switch (e.key.keysym.sym) {
+          case SDLK_UP:
+            direction.select_or_up = true;
+            break;
+          case SDLK_DOWN:
+            direction.start_or_down = true;
+            break;
+          case SDLK_LEFT:
+            direction.b_or_left = true;
+            break;
+          case SDLK_RIGHT:
+            direction.a_or_right = true;
+            break;
+          case SDLK_SPACE:
+            actions.a_or_right = true;
+            break;
+          case SDLK_x:
+            actions.b_or_left = true;
+            break;
+          case SDLK_RETURN:
+            actions.start_or_down = true;
+            break;
+          case SDLK_c:
+            actions.select_or_up = true;
+            break;
+        }
       }
     }
     CPU::RunFrame(debug);
